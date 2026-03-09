@@ -65,7 +65,7 @@ func newKeyMap() keyMap {
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Connect, k.Import, k.Help, k.Quit}
+	return []key.Binding{k.Connect, k.Disconnect, k.Import, k.Help, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {

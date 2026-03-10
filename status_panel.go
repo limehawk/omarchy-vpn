@@ -155,7 +155,7 @@ func (m model) renderStatusPanel(width, height int) string {
 }
 
 func renderField(icon, label, value string, maxWidth int) string {
-	iconStyled := lipgloss.NewStyle().Foreground(overlay0).Render("  " + icon + " ")
+	iconStyled := lipgloss.NewStyle().Foreground(dimCol).Render("  " + icon + " ")
 	labelStyled := labelStyle.Render(label)
 	valueStyled := valueStyle.Render(value)
 	return iconStyled + labelStyled + valueStyled

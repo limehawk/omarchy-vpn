@@ -80,12 +80,12 @@ func (k keyMap) FullHelp() [][]key.Binding {
 func newHelp() help.Model {
 	h := help.New()
 	s := help.DefaultDarkStyles()
-	s.ShortKey = lipgloss.NewStyle().Foreground(lavender).Bold(true)
-	s.ShortDesc = lipgloss.NewStyle().Foreground(overlay0)
-	s.ShortSeparator = lipgloss.NewStyle().Foreground(surface1)
-	s.FullKey = lipgloss.NewStyle().Foreground(lavender).Bold(true)
-	s.FullDesc = lipgloss.NewStyle().Foreground(subtext)
-	s.FullSeparator = lipgloss.NewStyle().Foreground(surface1)
+	s.ShortKey = lipgloss.NewStyle().Foreground(accent).Bold(true)
+	s.ShortDesc = lipgloss.NewStyle().Foreground(dimCol)
+	s.ShortSeparator = lipgloss.NewStyle().Foreground(borderCol)
+	s.FullKey = lipgloss.NewStyle().Foreground(accent).Bold(true)
+	s.FullDesc = lipgloss.NewStyle().Foreground(textCol)
+	s.FullSeparator = lipgloss.NewStyle().Foreground(borderCol)
 	h.Styles = s
 	h.ShortSeparator = " │ "
 	h.FullSeparator = " │ "

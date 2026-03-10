@@ -1,114 +1,140 @@
 package main
 
-import "charm.land/lipgloss/v2"
+import (
+	"image/color"
 
-// Catppuccin Mocha
+	"charm.land/lipgloss/v2"
+)
+
+// Semantic color variables — set by initColors() in theme.go
 var (
-	green    = lipgloss.Color("#a6e3a1")
-	red      = lipgloss.Color("#f38ba8")
-	blue     = lipgloss.Color("#89b4fa")
-	yellow   = lipgloss.Color("#f9e2af")
-	lavender = lipgloss.Color("#b4befe")
-	mauve    = lipgloss.Color("#cba6f7")
-	teal     = lipgloss.Color("#94e2d5")
-	peach    = lipgloss.Color("#fab387")
-	textCol  = lipgloss.Color("#cdd6f4")
-	subtext  = lipgloss.Color("#a6adc8")
-	overlay0 = lipgloss.Color("#6c7086")
-	surface0 = lipgloss.Color("#313244")
-	surface1 = lipgloss.Color("#45475a")
-	base     = lipgloss.Color("#1e1e2e")
+	green     color.Color // connected, active states
+	red       color.Color // errors
+	yellow    color.Color // warnings
+	accent    color.Color // titles, active borders, highlights, shortcuts
+	textCol   color.Color // primary text
+	dimCol    color.Color // labels, inactive text, dim elements
+	borderCol color.Color // panel borders, dividers
+	base      color.Color // background
+)
 
+// Style variables — set by initStyles()
+var (
+	titleStyle               lipgloss.Style
+	titleAccentStyle         lipgloss.Style
+	activeBorderStyle        lipgloss.Style
+	connectedBorderStyle     lipgloss.Style
+	inactiveBorderStyle      lipgloss.Style
+	panelTitleStyle          lipgloss.Style
+	panelTitleConnectedStyle lipgloss.Style
+	panelTitleDimStyle       lipgloss.Style
+	itemStyle                lipgloss.Style
+	selectedItemStyle        lipgloss.Style
+	activeMarkerStyle        lipgloss.Style
+	labelStyle               lipgloss.Style
+	valueStyle               lipgloss.Style
+	connectedStyle           lipgloss.Style
+	errorStyle               lipgloss.Style
+	warnStyle                lipgloss.Style
+	dimStyle                 lipgloss.Style
+	shortcutKeyStyle         lipgloss.Style
+	helpOverlayStyle         lipgloss.Style
+	helpTitleStyle           lipgloss.Style
+	inputPromptStyle         lipgloss.Style
+	spinnerStyle             lipgloss.Style
+	connectedIndicator       string
+	disconnectedIndicator    string
+)
+
+func initStyles() {
 	// Title bar
 	titleStyle = lipgloss.NewStyle().
-			Foreground(blue).
-			Bold(true)
+		Foreground(accent).
+		Bold(true)
 
 	titleAccentStyle = lipgloss.NewStyle().
-				Foreground(lavender)
+		Foreground(accent)
 
 	// Panel borders
 	activeBorderStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(blue)
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(accent)
 
 	connectedBorderStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(green)
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(green)
 
 	inactiveBorderStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(surface1)
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderCol)
 
 	// Panel titles (rendered inside top border)
 	panelTitleStyle = lipgloss.NewStyle().
-			Foreground(blue).
-			Bold(true).
-			Background(base).
-			Padding(0, 1)
+		Foreground(accent).
+		Bold(true).
+		Background(base).
+		Padding(0, 1)
 
 	panelTitleConnectedStyle = lipgloss.NewStyle().
-					Foreground(green).
-					Bold(true).
-					Background(base).
-					Padding(0, 1)
+		Foreground(green).
+		Bold(true).
+		Background(base).
+		Padding(0, 1)
 
 	panelTitleDimStyle = lipgloss.NewStyle().
-				Foreground(overlay0).
-				Background(base).
-				Padding(0, 1)
+		Foreground(dimCol).
+		Background(base).
+		Padding(0, 1)
 
 	// List items
 	itemStyle = lipgloss.NewStyle().
-			Foreground(subtext)
+		Foreground(textCol)
 
 	selectedItemStyle = lipgloss.NewStyle().
-				Foreground(green).
-				Bold(true)
+		Foreground(green).
+		Bold(true)
 
 	activeMarkerStyle = lipgloss.NewStyle().
-				Foreground(green)
+		Foreground(green)
 
 	// Status field icons and labels
 	labelStyle = lipgloss.NewStyle().
-			Foreground(overlay0).
-			Width(14)
+		Foreground(dimCol).
+		Width(14)
 
 	valueStyle = lipgloss.NewStyle().
-			Foreground(textCol)
+		Foreground(textCol)
 
 	// Feedback
 	connectedStyle = lipgloss.NewStyle().Foreground(green)
-	errorStyle     = lipgloss.NewStyle().Foreground(red)
-	warnStyle      = lipgloss.NewStyle().Foreground(yellow)
-	dimStyle       = lipgloss.NewStyle().Foreground(overlay0)
+	errorStyle = lipgloss.NewStyle().Foreground(red)
+	warnStyle = lipgloss.NewStyle().Foreground(yellow)
+	dimStyle = lipgloss.NewStyle().Foreground(dimCol)
 
 	// Bottom bar
 	shortcutKeyStyle = lipgloss.NewStyle().
-				Foreground(lavender).
-				Bold(true)
-
+		Foreground(accent).
+		Bold(true)
 
 	// Help overlay
 	helpOverlayStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(mauve).
-				Padding(1, 3)
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(accent).
+		Padding(1, 3)
 
 	helpTitleStyle = lipgloss.NewStyle().
-			Foreground(mauve).
-			Bold(true)
+		Foreground(accent).
+		Bold(true)
 
 	// Inline input
 	inputPromptStyle = lipgloss.NewStyle().
-				Foreground(blue)
+		Foreground(accent)
 
 	// Spinner
 	spinnerStyle = lipgloss.NewStyle().
-			Foreground(blue)
+		Foreground(accent)
 
 	// Connection status indicator
-	connectedIndicator   = lipgloss.NewStyle().Foreground(green).Bold(true).Render("●")
-	disconnectedIndicator = lipgloss.NewStyle().Foreground(overlay0).Render("○")
-)
-
+	connectedIndicator = lipgloss.NewStyle().Foreground(green).Bold(true).Render("●")
+	disconnectedIndicator = lipgloss.NewStyle().Foreground(dimCol).Render("○")
+}

@@ -1,7 +1,12 @@
 _run_as_user() {
     local real_user="${SUDO_USER:-$(logname 2>/dev/null)}"
     [ -z "$real_user" ] && return
-    machinectl shell --uid="$real_user" .host /bin/sh -c "$1" 2>/dev/null || true
+
+    # Try machinectl first (preserves full user session), fall back to su
+    if machinectl shell --uid="$real_user" .host /bin/sh -c "$1" 2>/dev/null; then
+        return
+    fi
+    su - "$real_user" -c "$1" 2>/dev/null || true
 }
 
 post_install() {

@@ -29,6 +29,7 @@
 - **Built-in file picker** — browse and import `.conf` / `.wg` files natively
 - **Catppuccin Mocha** — terminal colors with nerd font icons
 - **Persistent connections** — quit the TUI, VPN stays connected
+- **Waybar integration** — status icon with connection details tooltip, click to launch TUI
 - **Zero config** — passwordless via sudoers, just run `omarchy-vpn`
 
 ## Installation
@@ -105,6 +106,17 @@ Press `i` to open the file picker. Navigate to your `.conf` or `.wg` file and se
 ```bash
 sudo cp *.conf /etc/wireguard/
 sudo chmod 600 /etc/wireguard/*.conf
+```
+
+## Waybar
+
+The package automatically adds a VPN status module to waybar on install and removes it on uninstall. The icon shows connection state and the tooltip displays endpoint and transfer stats. Click to launch the TUI.
+
+If you need to manually manage the waybar module:
+
+```bash
+omarchy-vpn --setup-waybar    # Add module to waybar config + style
+omarchy-vpn --remove-waybar   # Remove module from waybar config + style
 ```
 
 ## How It Works

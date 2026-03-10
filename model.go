@@ -104,7 +104,7 @@ func initialModel() model {
 	ti.Prompt = ""
 	s := textinput.DefaultDarkStyles()
 	s.Focused.Text = lipgloss.NewStyle().Foreground(green)
-	s.Cursor.Color = lavender
+	s.Cursor.Color = accent
 	ti.SetStyles(s)
 	ti.CharLimit = 64
 

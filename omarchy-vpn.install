@@ -1,0 +1,17 @@
+_run_as_user() {
+    local real_user="${SUDO_USER:-$(logname 2>/dev/null)}"
+    [ -z "$real_user" ] && return
+    machinectl shell --uid="$real_user" .host /bin/sh -c "$1" 2>/dev/null || true
+}
+
+post_install() {
+    _run_as_user "omarchy-vpn --setup-waybar"
+}
+
+post_upgrade() {
+    _run_as_user "omarchy-vpn --remove-waybar && omarchy-vpn --setup-waybar"
+}
+
+pre_remove() {
+    _run_as_user "omarchy-vpn --remove-waybar"
+}

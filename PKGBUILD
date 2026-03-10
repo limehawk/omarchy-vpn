@@ -8,6 +8,7 @@ url="https://github.com/limehawk/omarchy-vpn"
 license=('MIT')
 depends=('wireguard-tools' 'systemd-resolvconf')
 makedepends=('go')
+install=omarchy-vpn.install
 
 build() {
     cd "$startdir"

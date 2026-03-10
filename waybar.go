@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -38,7 +37,6 @@ func setupWaybar() error {
 	if err := patchWaybarStyle(); err != nil {
 		return fmt.Errorf("style: %w", err)
 	}
-	exec.Command("omarchy-restart-waybar").Run()
 	fmt.Println("Waybar VPN module installed.")
 	return nil
 }
@@ -50,10 +48,10 @@ func removeWaybar() error {
 	if err := unpatchWaybarStyle(); err != nil {
 		return fmt.Errorf("style: %w", err)
 	}
-	exec.Command("omarchy-restart-waybar").Run()
 	fmt.Println("Waybar VPN module removed.")
 	return nil
 }
+
 
 func patchWaybarConfig() error {
 	path := waybarConfigPath()

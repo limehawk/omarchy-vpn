@@ -1,0 +1,34 @@
+fileignoreconfig:
+- filename: go.sum
+  ignore_detectors:
+    - filecontent
+- filename: help.go
+  ignore_detectors:
+    - filecontent
+- filename: styles.go
+  ignore_detectors:
+    - filecontent
+- filename: status_panel.go
+  ignore_detectors:
+    - filecontent
+- filename: model.go
+  ignore_detectors:
+    - filecontent
+- filename: PKGBUILD
+  ignore_detectors:
+    - filecontent
+- filename: README.md
+  ignore_detectors:
+    - filecontent
+- filename: wireguard.go
+  ignore_detectors:
+    - filecontent
+- filename: theme.go
+  ignore_detectors:
+    - filecontent
+- filename: config_panel.go
+  ignore_detectors:
+    - filecontent
+- filename: demo.gif
+  checksum: 83f6f04599fe68397275c6e564959030417df7e871b98edbf8e0ea2c50aa27a6
+version: "1.0"

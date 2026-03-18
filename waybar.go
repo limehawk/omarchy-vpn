@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -53,6 +54,7 @@ func setupWaybar() error {
 		return fmt.Errorf("hyprland: %w", err)
 	}
 	fmt.Println("Waybar VPN module installed.")
+	reloadWaybar()
 	return nil
 }
 
@@ -67,9 +69,15 @@ func removeWaybar() error {
 		return fmt.Errorf("hyprland: %w", err)
 	}
 	fmt.Println("Waybar VPN module removed.")
+	reloadWaybar()
 	return nil
 }
 
+func reloadWaybar() {
+	if path, err := exec.LookPath("omarchy-restart-waybar"); err == nil {
+		exec.Command(path).Run()
+	}
+}
 
 func patchWaybarConfig() error {
 	path := waybarConfigPath()

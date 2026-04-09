@@ -35,7 +35,8 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 | `dashboard.go` | `View()` — title bar + panels + help bar, returns `tea.View` |
 | `config_panel.go` | Left panel — config list with inline rename/delete/connecting states |
 | `status_panel.go` | Right panel — live stats (connected) or config preview (disconnected) |
-| `wireguard.go` | Backend — all `sudo` exec calls to wg-quick/wg/ls/cp/mv/rm |
+| `wireguard.go` | Backend — config name validation + all `sudo` exec calls to wg-quick/wg |
+| `waybar.go` | Waybar module — `--waybar` JSON output + `--setup`/`--remove` config management |
 | `styles.go` | Semantic color variables + all lipgloss styles (initialized by `initStyles()`) |
 | `theme.go` | ANSI terminal color assignments → `initColors()` → `initStyles()` |
 | `help.go` | `keyMap` with `key.Binding` definitions, `help.Model` with custom styles |
@@ -58,8 +59,6 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 - `systemd-resolvconf` is required (provides `resolvconf` shim for wg-quick DNS)
 - Config names are sanitized to `[a-zA-Z0-9_-]` only
 - Cannot rename or delete the active VPN — must disconnect first
-- This is a PUBLIC repo — never commit client data, IPs, or config names
-- No co-author lines in commits
 
 ## AUR Publishing
 
@@ -70,7 +69,7 @@ The package is published to AUR at `https://aur.archlinux.org/packages/omarchy-v
 | GitHub | `github.com/limehawk/omarchy-vpn` | Source code + local-build PKGBUILD |
 | AUR | `aur.archlinux.org/omarchy-vpn.git` | Tarball PKGBUILD + `.SRCINFO` + `.install` only |
 
-**AUR SSH:** Key is "Arch AUR SSH Key" in 1Password Dev vault. SSH config at `~/.ssh/config` routes `aur.archlinux.org` through the 1Password agent. Agent config at `~/.config/1Password/ssh/agent.toml`.
+**AUR SSH:** Requires an SSH key registered with AUR. See [AUR submission guidelines](https://wiki.archlinux.org/title/AUR_submission_guidelines).
 
 **Release process:**
 
@@ -96,7 +95,6 @@ git commit -m "Update to 0.X.X: description"
 git push
 ```
 
-**Talisman:** AUR pushes trigger talisman false positives on sha256 checksums and sudoers rules. The `.talismanrc` in the AUR repo ignores these.
 
 ## Theming
 

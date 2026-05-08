@@ -18,7 +18,7 @@ const waybarModuleBlock = `  "custom/vpn": {
 
 const waybarCSSBase = `
 #custom-vpn {
-  margin-right: 15px;
+  margin-right: 19px;
 }`
 
 const waybarCSSConnected = `
@@ -160,12 +160,7 @@ func patchWaybarStyle() error {
 	}
 	content := string(data)
 
-	// Add #custom-vpn to the shared selector group with cpu, battery, etc.
 	if !strings.Contains(content, "#custom-vpn") {
-		content = strings.Replace(content,
-			"#custom-update {",
-			"#custom-vpn,\n#custom-update {",
-			1)
 		content += waybarCSSBase
 		content += waybarCSSConnected
 	}
@@ -185,7 +180,6 @@ func unpatchWaybarStyle() error {
 		return nil
 	}
 
-	content = strings.Replace(content, "#custom-vpn,\n", "", 1)
 	content = strings.Replace(content, waybarCSSBase, "", 1)
 	content = strings.Replace(content, waybarCSSConnected, "", 1)
 

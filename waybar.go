@@ -182,6 +182,8 @@ func unpatchWaybarStyle() error {
 
 	content = strings.Replace(content, waybarCSSBase, "", 1)
 	content = strings.Replace(content, waybarCSSConnected, "", 1)
+	// Clean up the legacy selector-group injection from pre-#18 installs
+	content = strings.Replace(content, "#custom-vpn,\n", "", 1)
 
 	return os.WriteFile(path, []byte(content), 0644)
 }

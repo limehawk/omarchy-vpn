@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -28,19 +29,21 @@ type VPNStatus struct {
 	Handshake  string
 }
 
+// GetActiveVPN returns the first active WireGuard interface that
+// corresponds to a config in /etc/wireguard/. Foreign interfaces from
+// other WireGuard apps (NetBird, Tailscale, etc.) are ignored.
 func GetActiveVPN() string {
 	out, err := exec.Command("sudo", "wg", "show", "interfaces").Output()
 	if err != nil {
 		return ""
 	}
-	iface := strings.TrimSpace(string(out))
-	if i := strings.Index(iface, "\n"); i != -1 {
-		iface = iface[:i]
+	managed := ListConfigs()
+	for _, iface := range strings.Fields(string(out)) {
+		if isValidConfigName(iface) && slices.Contains(managed, iface) {
+			return iface
+		}
 	}
-	if !isValidConfigName(iface) {
-		return ""
-	}
-	return iface
+	return ""
 }
 
 func ListConfigs() []string {

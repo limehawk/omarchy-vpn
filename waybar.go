@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -152,20 +153,39 @@ func unpatchWaybarConfig() error {
 	return os.WriteFile(path, []byte(content), 0644)
 }
 
+// vpnStyleRule matches a standalone #custom-vpn rule (the base block or the
+// .connected variant), along with any blank lines preceding it. It deliberately
+// does NOT match the legacy shared selector-group injection
+// (#custom-vpn,\n#custom-update { ... }) — that comma form contains a newline
+// before the brace, so the neighbouring rule is preserved and cleaned up
+// separately by stripVPNStyle.
+var vpnStyleRule = regexp.MustCompile(`\n*#custom-vpn[^{}\n]*\{[^}]*\}`)
+
+// stripVPNStyle removes every VPN rule a previous install wrote, regardless of
+// which version wrote it (margins have been 13px, 15px, 19px across releases).
+func stripVPNStyle(content string) string {
+	content = vpnStyleRule.ReplaceAllString(content, "")
+	// Pre-#18 installs folded #custom-vpn into the shared selector group.
+	content = strings.Replace(content, "#custom-vpn,\n", "", 1)
+	return content
+}
+
+// styleWithVPN returns the stylesheet with the current VPN rules applied,
+// replacing any rules an older install may have written. Version-agnostic and
+// idempotent: re-running setup after an upgrade re-normalizes the block instead
+// of leaving stale styling in place.
+func styleWithVPN(content string) string {
+	content = strings.TrimRight(stripVPNStyle(content), "\n")
+	return content + waybarCSSBase + waybarCSSConnected
+}
+
 func patchWaybarStyle() error {
 	path := waybarStylePath()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	content := string(data)
-
-	if !strings.Contains(content, "#custom-vpn") {
-		content += waybarCSSBase
-		content += waybarCSSConnected
-	}
-
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(styleWithVPN(string(data))), 0644)
 }
 
 func unpatchWaybarStyle() error {
@@ -180,12 +200,7 @@ func unpatchWaybarStyle() error {
 		return nil
 	}
 
-	content = strings.Replace(content, waybarCSSBase, "", 1)
-	content = strings.Replace(content, waybarCSSConnected, "", 1)
-	// Clean up the legacy selector-group injection from pre-#18 installs
-	content = strings.Replace(content, "#custom-vpn,\n", "", 1)
-
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(strings.TrimRight(stripVPNStyle(content), "\n")+"\n"), 0644)
 }
 
 func patchHyprlandConfig() error {

@@ -316,26 +316,29 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case key.Matches(msg, m.keys.Down):
-		if len(m.configs) > 0 {
+		if m.listLen() > 0 {
 			m.cursor++
-			if m.cursor >= len(m.configs) {
+			if m.cursor >= m.listLen() {
 				m.cursor = 0
 			}
 		}
 
 	case key.Matches(msg, m.keys.Up):
-		if len(m.configs) > 0 {
+		if m.listLen() > 0 {
 			m.cursor--
 			if m.cursor < 0 {
-				m.cursor = len(m.configs) - 1
+				m.cursor = m.listLen() - 1
 			}
 		}
 
 	case key.Matches(msg, m.keys.Connect):
-		if len(m.configs) == 0 {
+		if m.netbirdSelected() {
+			return m.connectNetbird()
+		}
+		selected := m.selectedConfig()
+		if selected == "" {
 			break
 		}
-		selected := m.configs[m.cursor]
 		if selected == m.activeVPN {
 			m.setMessage(dimStyle.Render("  Already connected"))
 			break
@@ -354,6 +357,14 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		})
 
 	case key.Matches(msg, m.keys.Disconnect):
+		if m.netbirdSelected() {
+			if !m.netbirdStatus.Connected() {
+				break
+			}
+			return m, func() tea.Msg {
+				return netbirdDoneMsg{up: false, err: NetBirdDown()}
+			}
+		}
 		if m.activeVPN == "" {
 			break
 		}
@@ -370,10 +381,14 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.filePicker.Init()
 
 	case key.Matches(msg, m.keys.Rename):
-		if len(m.configs) == 0 {
+		if m.netbirdSelected() {
+			m.setMessage(warnStyle.Render("  NetBird is managed by its own daemon"))
 			break
 		}
-		selected := m.configs[m.cursor]
+		selected := m.selectedConfig()
+		if selected == "" {
+			break
+		}
 		if selected == m.activeVPN {
 			m.setMessage(warnStyle.Render("  Disconnect before renaming"))
 			break
@@ -386,10 +401,14 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, textinput.Blink
 
 	case key.Matches(msg, m.keys.Delete):
-		if len(m.configs) == 0 {
+		if m.netbirdSelected() {
+			m.setMessage(warnStyle.Render("  NetBird is managed by its own daemon"))
 			break
 		}
-		selected := m.configs[m.cursor]
+		selected := m.selectedConfig()
+		if selected == "" {
+			break
+		}
 		if selected == m.activeVPN {
 			m.setMessage(warnStyle.Render("  Disconnect before deleting"))
 			break
@@ -402,6 +421,22 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m *model) connectNetbird() (tea.Model, tea.Cmd) {
+	if m.netbirdStatus.Connected() {
+		m.setMessage(dimStyle.Render("  Already connected"))
+		return m, nil
+	}
+	if m.netbirdStatus.NeedsLogin() {
+		m.setMessage(warnStyle.Render("  NetBird needs login — run `netbird up` in a terminal"))
+		return m, nil
+	}
+	m.modal = modalConnecting
+	m.connectName = netbirdRowName
+	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
+		return netbirdDoneMsg{up: true, err: NetBirdUp()}
+	})
 }
 
 func (m *model) updateImport(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -494,7 +529,11 @@ func (m *model) updateRename(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m *model) updateDelete(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y":
-		name := m.configs[m.cursor]
+		name := m.selectedConfig()
+		if name == "" {
+			m.modal = modalNone
+			return m, nil
+		}
 		m.modal = modalNone
 		return m, func() tea.Msg {
 			err := RemoveConfig(name)

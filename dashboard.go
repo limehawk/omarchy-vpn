@@ -83,13 +83,17 @@ func (m model) renderTitleBar() string {
 	icon := titleStyle.Render("󰖂 ")
 	name := titleStyle.Render("omarchy-vpn")
 
+	sep := titleAccentStyle.Render("  ─  ")
 	var status string
-	if m.activeVPN != "" {
-		status = titleAccentStyle.Render("  ─  ") +
-			connectedStyle.Render("● " + m.activeVPN)
-	} else {
-		status = titleAccentStyle.Render("  ─  ") +
-			dimStyle.Render("○ disconnected")
+	switch {
+	case m.activeVPN != "" && m.netbirdStatus.Connected():
+		status = sep + connectedStyle.Render("● "+m.activeVPN) + "  " + connectedStyle.Render("● NetBird")
+	case m.activeVPN != "":
+		status = sep + connectedStyle.Render("● "+m.activeVPN)
+	case m.netbirdStatus.Connected():
+		status = sep + connectedStyle.Render("● NetBird")
+	default:
+		status = sep + dimStyle.Render("○ disconnected")
 	}
 
 	return " " + icon + name + status + "\n"

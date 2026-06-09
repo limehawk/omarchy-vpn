@@ -36,6 +36,7 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 | `config_panel.go` | Left panel — config list with inline rename/delete/connecting states |
 | `status_panel.go` | Right panel — live stats (connected) or config preview (disconnected) |
 | `wireguard.go` | Backend — config name validation + all `sudo` exec calls to wg-quick/wg |
+| `netbird.go` | NetBird backend — `netbird status --json` parsing + up/down (no sudo, talks to daemon) |
 | `waybar.go` | Waybar module — `--waybar` JSON output + `--setup`/`--remove` config management |
 | `styles.go` | Semantic color variables + all lipgloss styles (initialized by `initStyles()`) |
 | `theme.go` | ANSI terminal color assignments → `initColors()` → `initStyles()` |
@@ -59,6 +60,8 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 - `systemd-resolvconf` is required (provides `resolvconf` shim for wg-quick DNS)
 - Config names are sanitized to `[a-zA-Z0-9_-]` only
 - Cannot rename or delete the active VPN — must disconnect first
+- NetBird row appears only when the `netbird` binary is installed; it coexists with WG tunnels (overlay mesh, not mutually exclusive)
+- `netbird up` is never run when the daemon reports NeedsLogin/SessionExpired — it would block on browser SSO
 
 ## AUR Publishing
 

@@ -55,6 +55,10 @@ func ParseConfigFile(name string) ConfigInfo {
 }
 
 func (m model) renderStatusPanel(width, height int) string {
+	if m.netbirdSelected() {
+		return m.renderNetbirdStatusPanel(width, height)
+	}
+
 	innerWidth := width - 4 // border + padding
 	contentHeight := height - 2
 
@@ -98,9 +102,8 @@ func (m model) renderStatusPanel(width, height int) string {
 		lines = append(lines, renderField("󰈔", "Config", m.activeVPN, innerWidth))
 		lines = append(lines, renderField("󰉋", "Path", fmt.Sprintf("/etc/wireguard/%s.conf", m.activeVPN), innerWidth))
 
-	} else if len(m.configs) > 0 && m.cursor < len(m.configs) {
+	} else if name := m.selectedConfig(); name != "" {
 		// Static preview of highlighted config
-		name := m.configs[m.cursor]
 		border = inactiveBorderStyle
 
 		info := ParseConfigFile(name)
@@ -152,6 +155,70 @@ func (m model) renderStatusPanel(width, height int) string {
 		Width(width - 2).
 		Height(contentHeight).
 		Render(content)
+}
+
+func (m model) renderNetbirdStatusPanel(width, height int) string {
+	innerWidth := width - 4
+	contentHeight := height - 2
+
+	var lines []string
+	var border lipgloss.Style
+	s := m.netbirdStatus
+
+	lines = append(lines, "")
+
+	switch {
+	case s.Connected():
+		border = connectedBorderStyle
+		badge := lipgloss.NewStyle().
+			Foreground(green).
+			Bold(true).
+			Render("  ● Connected")
+		lines = append(lines, badge, "")
+		if s.IP != "" {
+			lines = append(lines, renderField("󰩟", "Address", s.IP, innerWidth))
+		}
+		if s.FQDN != "" {
+			lines = append(lines, renderField("󰖟", "FQDN", s.FQDN, innerWidth))
+		}
+		lines = append(lines, renderField("󰀂", "Peers", fmt.Sprintf("%d/%d connected", s.PeersConnected, s.PeersTotal), innerWidth))
+		lines = append(lines, renderField("↓", "Download", formatBytes(s.TransferRx), innerWidth))
+		lines = append(lines, renderField("↑", "Upload", formatBytes(s.TransferTx), innerWidth))
+		if s.MgmtURL != "" {
+			lines = append(lines, "")
+			lines = append(lines, renderField("󰖟", "Management", s.MgmtURL, innerWidth))
+		}
+
+	case s.DaemonStatus == "":
+		border = inactiveBorderStyle
+		lines = append(lines, dimStyle.Render("  ○ Daemon not running"), "")
+		lines = append(lines, dimStyle.Render("  sudo systemctl enable --now netbird"))
+
+	case s.NeedsLogin():
+		border = inactiveBorderStyle
+		lines = append(lines, warnStyle.Render("  ○ Login required"), "")
+		lines = append(lines, dimStyle.Render("  Run `netbird up` in a terminal to log in."))
+
+	default: // Idle, Connecting, or unknown future states
+		border = inactiveBorderStyle
+		lines = append(lines, dimStyle.Render("  ○ Not connected"), "")
+		lines = append(lines, renderField("󰒓", "Status", s.DaemonStatus, innerWidth))
+		if s.MgmtURL != "" {
+			lines = append(lines, renderField("󰖟", "Management", s.MgmtURL, innerWidth))
+		}
+	}
+
+	for len(lines) < contentHeight {
+		lines = append(lines, "")
+	}
+	if len(lines) > contentHeight {
+		lines = lines[:contentHeight]
+	}
+
+	return border.
+		Width(width - 2).
+		Height(contentHeight).
+		Render(strings.Join(lines, "\n"))
 }
 
 func renderField(icon, label, value string, maxWidth int) string {

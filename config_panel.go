@@ -20,15 +20,25 @@ func (m model) renderConfigPanel(width, height int) string {
 
 	var lines []string
 
-	if len(m.configs) == 0 {
+	if m.listLen() == 0 {
 		lines = append(lines, "")
 		lines = append(lines, dimStyle.Render("  No configs found."))
 		lines = append(lines, dimStyle.Render("  Press "+shortcutKeyStyle.Render("i")+" to import."))
 	} else {
 		lines = append(lines, "") // top padding
-		for i, cfg := range m.configs {
-			line := m.renderConfigItem(cfg, i, width-4)
-			lines = append(lines, line)
+		idx := 0
+		if m.netbirdAvail {
+			lines = append(lines, m.renderNetbirdItem(idx, width-4))
+			idx++
+		}
+		for _, cfg := range m.configs {
+			lines = append(lines, m.renderConfigItem(cfg, idx, width-4))
+			idx++
+		}
+		if len(m.configs) == 0 {
+			lines = append(lines, "")
+			lines = append(lines, dimStyle.Render("  No configs found."))
+			lines = append(lines, dimStyle.Render("  Press "+shortcutKeyStyle.Render("i")+" to import."))
 		}
 	}
 
@@ -44,7 +54,7 @@ func (m model) renderConfigPanel(width, height int) string {
 
 	// Choose border style based on connection state
 	border := activeBorderStyle
-	if m.activeVPN != "" {
+	if m.activeVPN != "" || m.netbirdStatus.Connected() {
 		border = connectedBorderStyle
 	}
 
@@ -87,6 +97,33 @@ func (m model) renderConfigItem(name string, index, maxWidth int) string {
 	}
 
 	if isActive {
+		parts.WriteString(" ")
+		parts.WriteString(connectedIndicator)
+	}
+
+	return parts.String()
+}
+
+func (m model) renderNetbirdItem(index, maxWidth int) string {
+	isSelected := index == m.cursor
+
+	if isSelected && m.modal == modalConnecting && m.connectName == netbirdRowName {
+		return "  " + selectedItemStyle.Render("▸ ") +
+			m.spinner.View() + " " +
+			selectedItemStyle.Render(netbirdRowName)
+	}
+
+	var parts strings.Builder
+	if isSelected {
+		parts.WriteString("  ")
+		parts.WriteString(selectedItemStyle.Render("▸ "))
+		parts.WriteString(selectedItemStyle.Render(netbirdRowName))
+	} else {
+		parts.WriteString("    ")
+		parts.WriteString(itemStyle.Render(netbirdRowName))
+	}
+
+	if m.netbirdStatus.Connected() {
 		parts.WriteString(" ")
 		parts.WriteString(connectedIndicator)
 	}

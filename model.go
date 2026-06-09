@@ -38,6 +38,10 @@ type model struct {
 	activeVPN string
 	vpnStatus VPNStatus
 
+	// NetBird state (only meaningful when netbirdAvail is true)
+	netbirdAvail  bool
+	netbirdStatus NetBirdStatus
+
 	// Modal state
 	modal       modalState
 	renameInput textinput.Model
@@ -55,6 +59,34 @@ type model struct {
 	messageExp time.Time // when to clear the message
 }
 
+// listLen returns the number of rows in the left panel list, including the
+// pinned NetBird row when present.
+func (m model) listLen() int {
+	n := len(m.configs)
+	if m.netbirdAvail {
+		n++
+	}
+	return n
+}
+
+// netbirdSelected reports whether the cursor is on the pinned NetBird row.
+func (m model) netbirdSelected() bool {
+	return m.netbirdAvail && m.cursor == 0
+}
+
+// selectedConfig returns the WireGuard config under the cursor, or "" if the
+// cursor is on the NetBird row or the list is empty.
+func (m model) selectedConfig() string {
+	i := m.cursor
+	if m.netbirdAvail {
+		i--
+	}
+	if i < 0 || i >= len(m.configs) {
+		return ""
+	}
+	return m.configs[i]
+}
+
 // Messages
 
 type connectDoneMsg struct {
@@ -63,6 +95,11 @@ type connectDoneMsg struct {
 }
 
 type disconnectDoneMsg struct {
+	err error
+}
+
+type netbirdDoneMsg struct {
+	up  bool // true for `netbird up`, false for `netbird down`
 	err error
 }
 
@@ -122,6 +159,10 @@ func initialModel() model {
 	}
 	m.activeVPN = GetActiveVPN()
 	m.configs = ListConfigs()
+	m.netbirdAvail = NetBirdAvailable()
+	if m.netbirdAvail {
+		m.netbirdStatus, _ = GetNetBirdStatus()
+	}
 	return m
 }
 
@@ -141,11 +182,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.activeVPN != "" {
 			m.vpnStatus, _ = GetVPNStatus(m.activeVPN)
 		}
+		if m.netbirdAvail {
+			m.netbirdStatus, _ = GetNetBirdStatus()
+		}
 		configs := ListConfigs()
 		if len(configs) != len(m.configs) {
 			m.configs = configs
-			if m.cursor >= len(m.configs) && m.cursor > 0 {
-				m.cursor = len(m.configs) - 1
+			if m.cursor >= m.listLen() && m.cursor > 0 {
+				m.cursor = m.listLen() - 1
 			}
 		}
 		return m, statusTick()
@@ -169,6 +213,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setMessage(dimStyle.Render("  Disconnected"))
 			m.activeVPN = ""
 			m.vpnStatus = VPNStatus{}
+		}
+		return m, nil
+
+	case netbirdDoneMsg:
+		m.modal = modalNone
+		if m.netbirdAvail {
+			m.netbirdStatus, _ = GetNetBirdStatus()
+		}
+		if msg.err != nil {
+			m.setMessage(errorStyle.Render("  NetBird: " + msg.err.Error()))
+		} else if msg.up {
+			m.setMessage(connectedStyle.Render("  NetBird connected"))
+		} else {
+			m.setMessage(dimStyle.Render("  NetBird disconnected"))
 		}
 		return m, nil
 

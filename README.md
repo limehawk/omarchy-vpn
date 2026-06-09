@@ -29,6 +29,7 @@
 - **Built-in file picker** — browse and import `.conf` / `.wg` files natively
 - **Catppuccin Mocha** — terminal colors with nerd font icons
 - **Persistent connections** — quit the TUI, VPN stays connected
+- **NetBird aware** — if NetBird is installed, toggle it from the same dashboard alongside your WireGuard tunnels
 - **Waybar integration** — status icon with connection details tooltip, click to launch TUI
 - **Zero config** — passwordless via sudoers, just run `omarchy-vpn`
 

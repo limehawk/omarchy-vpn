@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -44,15 +45,27 @@ func printWaybarStatus() {
 		Class   string `json:"class"`
 	}{Text: "󰳌", Tooltip: "VPN: Disconnected", Class: "disconnected"}
 
+	var parts []string
+
 	iface := GetActiveVPN()
 	if iface != "" {
-		status, err := GetVPNStatus(iface)
-		if err == nil {
-			out.Text = "󰦝"
-			out.Tooltip = fmt.Sprintf("VPN: %s\nEndpoint: %s\nTransfer: %s / %s",
-				iface, status.Endpoint, status.TransferRx, status.TransferTx)
-			out.Class = "connected"
+		if status, err := GetVPNStatus(iface); err == nil {
+			parts = append(parts, fmt.Sprintf("VPN: %s\nEndpoint: %s\nTransfer: %s / %s",
+				iface, status.Endpoint, status.TransferRx, status.TransferTx))
 		}
+	}
+
+	if NetBirdAvailable() {
+		if nb, err := GetNetBirdStatus(); err == nil && nb.Connected() {
+			parts = append(parts, fmt.Sprintf("NetBird: %s\nPeers: %d/%d connected",
+				nb.IP, nb.PeersConnected, nb.PeersTotal))
+		}
+	}
+
+	if len(parts) > 0 {
+		out.Text = "󰦝"
+		out.Tooltip = strings.Join(parts, "\n")
+		out.Class = "connected"
 	}
 
 	data, _ := json.Marshal(out)

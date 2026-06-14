@@ -72,14 +72,18 @@ interface (premature for two similar-but-distinct backends).
 
 ### Config list (left panel)
 
-- When `exec.LookPath("warp-cli")` succeeds, a pinned **WARP** row appears
-  below the NetBird row (or at the top if NetBird is absent), above WG configs.
+- **Label: `Cloudflare WARP`** — the `warpRowName` constant, used everywhere
+  "NetBird" appears as a label: the list row, the title-bar badge, and the
+  waybar tooltip.
+- When `exec.LookPath("warp-cli")` succeeds, a pinned **Cloudflare WARP** row
+  appears below the NetBird row (or at the top if NetBird is absent), above WG
+  configs.
 - Not installed → row absent, nothing changes for existing users.
 - Same `●` connected indicator as configs.
 - Enter/space connects (`warp-cli connect`); `d` disconnects
   (`warp-cli disconnect`).
-- Rename (`r`), delete (`x`) on the row flash "WARP is managed by its own
-  daemon" and do nothing — same guard as NetBird.
+- Rename (`r`), delete (`x`) on the row flash "Cloudflare WARP is managed by
+  its own daemon" and do nothing — same guard as NetBird.
 
 ### Coexistence (WARP vs WireGuard)
 
@@ -109,9 +113,9 @@ Warning behavior (symmetric, no confirmation gate, connect still proceeds):
 
 - Connecting WARP while `activeVPN != ""` → the connect proceeds, and the
   result flash carries a conflict note, e.g.
-  `Connected to WARP — ⚠ WG tunnel 'homelab' is up; they may conflict`.
+  `Connected to Cloudflare WARP — ⚠ WG tunnel 'homelab' is up; they may conflict`.
 - Connecting a WG config while `warpStatus.Connected()` → same, mirrored:
-  `Connected to homelab — ⚠ WARP is up; they may conflict`.
+  `Connected to homelab — ⚠ Cloudflare WARP is up; they may conflict`.
 
 Rationale: split-tunnel setups (WARP split-tunnel / DoH-only, or a WG config
 with narrow `AllowedIPs`) are legitimate, so a hard block / auto-disconnect
@@ -145,9 +149,9 @@ pinned at impl):
 - **Needs registration / SSO** — no valid registration. Do **not** run
   `warp-cli connect` (consumer registration is non-interactive, but Zero Trust
   Teams enrollment blocks on browser SSO; we mirror the NetBird guard and back
-  off rather than guess). Flash / panel: "WARP needs registration — enroll in
-  a terminal." Detection mechanism (`status` field vs a `registration` /
-  `account` query) is pinned at impl.
+  off rather than guess). Flash / panel: "Cloudflare WARP needs registration —
+  enroll in a terminal." Detection mechanism (`status` field vs a
+  `registration` / `account` query) is pinned at impl.
 - **Daemon down** — `warp-cli` errors with `code: FailedToConnectToDaemon`.
   Row still shows; status panel says the daemon isn't running with a
   `sudo systemctl enable --now warp-svc` hint (mirrors NetBird's daemon-down
@@ -161,9 +165,9 @@ acting; otherwise enter `modalConnecting` and run `warp-cli connect`.
 
 - Title bar shows every active connection. With WARP added the existing
   N-way switch becomes combinatorial, so it's refactored into a **dynamic
-  badge builder**: append `● <name>` for each of {active WG, NetBird, WARP}
-  that is up; if none, show `○ disconnected`. (Targeted refactor justified by
-  the third state.)
+  badge builder**: append `● <name>` for each of {active WG, NetBird,
+  Cloudflare WARP} that is up; if none, show `○ disconnected`. (Targeted
+  refactor justified by the third state.)
 - `--waybar` already builds a `parts` slice and appends per-source, so WARP is
   an additive block: class `connected` if **any** of WG / NetBird / WARP is up;
   tooltip lists each. No refactor needed there.

@@ -91,18 +91,38 @@ other's traffic breaks. They only cleanly coexist when at least one is
 split-tunnel (WARP split-tunnel, WARP DoH-only/proxy mode, or a WG config with
 narrow `AllowedIPs`).
 
-**Decision (open for review):** the tool treats WARP like NetBird —
-**independent state, no enforced mutual exclusion.** `activeVPN` stays WG-only;
-`warpStatus` tracks WARP separately, refreshed on the 1-second `statusTick` via
-`warp-cli -j status`. Connecting WARP does **not** auto-disconnect an active WG
-tunnel (and vice versa). Rationale: split-tunnel setups are legitimate, so a
-hard block would be wrong; the tool reports daemon truth rather than enforcing
-routing policy. The conflict is captured as a CLAUDE.md gotcha.
+**Decision (approved): warn but allow.** The tool keeps WARP and WG as
+**independent state — no auto-disconnect, no routing logic** — but surfaces a
+**one-line warning at connect time** whenever the *other* tunnel is already up.
+`activeVPN` stays WG-only; `warpStatus` tracks WARP separately, refreshed on
+the 1-second `statusTick` via `warp-cli -j status`.
 
-> Alternative if we want it: treat WARP as mutually exclusive with WG (connecting
-> one disconnects the other, like switching between WG configs). More "correct"
-> for full-tunnel users, wrong for split-tunnel users, and crosses the
-> WG/daemon boundary. Not chosen unless the user prefers it.
+The trigger is purely "is the other one up?" (`activeVPN != ""` /
+`warpStatus.Connected()`) — the tool does **not** inspect WG `AllowedIPs` or
+WARP mode to tell split-tunnel from full-tunnel. That's deliberate: detecting
+real-vs-benign collisions means parsing routing intent on both sides
+(complexity we're not buying), so the message stays a soft "**may** conflict"
+heads-up. Split-tunnel users see a benign, accurate-enough warning; full-tunnel
+users get the real one. Simpler and never silently wrong.
+
+Warning behavior (symmetric, no confirmation gate, connect still proceeds):
+
+- Connecting WARP while `activeVPN != ""` → the connect proceeds, and the
+  result flash carries a conflict note, e.g.
+  `Connected to WARP — ⚠ WG tunnel 'homelab' is up; they may conflict`.
+- Connecting a WG config while `warpStatus.Connected()` → same, mirrored:
+  `Connected to homelab — ⚠ WARP is up; they may conflict`.
+
+Rationale: split-tunnel setups (WARP split-tunnel / DoH-only, or a WG config
+with narrow `AllowedIPs`) are legitimate, so a hard block / auto-disconnect
+would be wrong. But two full tunnels collide on the default route + DNS, and a
+silent collision is a bad surprise — so the tool reports daemon truth *and*
+flags the likely conflict without enforcing routing policy. The collision
+itself is also captured as a CLAUDE.md gotcha.
+
+This is warn-at-connect only — no persistent collision indicator in the status
+panel or title bar (kept out to avoid scope creep; revisit if it proves
+needed).
 
 ### Status panel (right panel)
 
@@ -153,7 +173,7 @@ acting; otherwise enter `modalConnecting` and run `warp-cli connect`.
 | File | Change |
 |------|--------|
 | `warp.go` (new) | `WarpAvailable()`, `WarpStatus` struct + `GetWarpStatus()` (parses `warp-cli -j status`, defensive), optional `GetWarpStats()`, `WarpUp()`, `WarpDown()`, state predicates `Connected()` / `NeedsRegistration()` / `DaemonDown()` |
-| `model.go` | `warpAvail`/`warpStatus` fields; `pinnedCount()` + `warpSelected()` helpers + generalized `selectedConfig()`; `warpDoneMsg`; tick refresh; connect/disconnect + rename/delete routing; `connectWarp()` |
+| `model.go` | `warpAvail`/`warpStatus` fields; `pinnedCount()` + `warpSelected()` helpers + generalized `selectedConfig()`; `warpDoneMsg`; tick refresh; connect/disconnect + rename/delete routing; `connectWarp()`; warn-at-connect collision note in both `connectWarp()` and the WG connect path |
 | `config_panel.go` | `renderPinnedItem()` (generalized from `renderNetbirdItem`); render WARP row; border-connected check includes `warpStatus.Connected()` |
 | `status_panel.go` | `renderWarpStatusPanel()` + dispatch when `warpSelected()` |
 | `dashboard.go` | Title bar dynamic badge builder (WG + NetBird + WARP) |
@@ -183,7 +203,9 @@ acting; otherwise enter `modalConnecting` and run `warp-cli connect`.
 - WARP registration / Teams SSO enrollment from inside the TUI.
 - Mode switching (`warp` / `doh` / `proxy`), trusted networks, WARP settings.
 - Managing the `warp-svc` systemd unit.
-- Enforced WG-vs-WARP conflict detection (documented gotcha only, unless the
-  coexistence decision above is flipped to mutual-exclusion).
+- Enforced WG-vs-WARP mutual exclusion / auto-disconnect / routing logic. The
+  tool warns at connect time (above) but never changes routes or disconnects
+  the other tunnel for you.
+- Persistent collision indicator in the status panel / title bar.
 - A generic pinned-backend abstraction (approach A) — revisit only if a third
   daemon-managed VPN is added.

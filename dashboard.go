@@ -81,7 +81,12 @@ func (m model) View() tea.View {
 }
 
 func (m model) renderTitleBar() string {
-	icon := titleStyle.Render("󰖂 ")
+	// Mirror the waybar tray glyph: shield-check when up, shield-off when down.
+	glyph := "󰳌"
+	if len(m.activeVPNs) > 0 || m.netbirdStatus.Connected() || m.warpStatus.Connected() {
+		glyph = "󰦝"
+	}
+	icon := titleStyle.Render(glyph + " ")
 	name := titleStyle.Render("omarchy-vpn")
 	ver := titleAccentStyle.Render(" " + displayVersion())
 

@@ -213,3 +213,32 @@ acting; otherwise enter `modalConnecting` and run `warp-cli connect`.
 - Persistent collision indicator in the status panel / title bar.
 - A generic pinned-backend abstraction (approach A) — revisit only if a third
   daemon-managed VPN is added.
+
+## As-built notes
+
+Decisions made during implementation, recorded so spec and code agree:
+
+- **Text parsing, not JSON.** `GetWarpStatus()` parses `warp-cli status` text
+  (`Status update: <State>`), not `warp-cli -j status`. The daemon was down on
+  the dev machine (can't start without sudo) and the JSON schema is
+  undocumented and drifts between releases; the text "Status update:" line is
+  community-proven stable for years. State matching is case-insensitive and
+  ordered (disconnected → connecting → connected) so "connected" inside
+  "disconnected" can't false-positive. Daemon-down is detected via the
+  "Unable to connect to the CloudflareWARP daemon" marker.
+- **Registration detection** uses `warp-cli registration show` exit code (run
+  only when not already connected), set into `WarpStatus.Registered`. The
+  status panel and `connectWarp()` guard both read it.
+- **Transfer stats deferred.** The connected detail panel shows the badge +
+  "Provider: Cloudflare WARP" only. A guessed `warp-cli stats` regex risked
+  rendering garbage (e.g. a latency value misread as bytes), so it was dropped
+  rather than faked. Trivial, safe add once a live connected `warp-cli stats`
+  output pins the format. Captured as a CLAUDE.md gotcha.
+- **No sudo confirmed in practice** — `warp-cli status` / `registration show`
+  run fine as the user. `connect`/`disconnect` couldn't be exercised offline
+  (no daemon/registration) but use the same socket; no sudoers rule added,
+  matching NetBird.
+- **Verified:** `go build`/`go vet`/`go test` pass; unit tests cover the parser
+  (all states + daemon-down) and the two-pinned-row index math; a PTY render
+  smoke confirmed the row, selection, and daemon-down status panel render with
+  no panic.

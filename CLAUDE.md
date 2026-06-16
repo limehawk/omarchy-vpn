@@ -37,6 +37,7 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 | `status_panel.go` | Right panel — live stats (connected) or config preview (disconnected) |
 | `wireguard.go` | Backend — config name validation + all `sudo` exec calls to wg-quick/wg |
 | `netbird.go` | NetBird backend — `netbird status --json` parsing + up/down (no sudo, talks to daemon) |
+| `warp.go` | Cloudflare WARP backend — `warp-cli status` **text** parsing + connect/disconnect (no sudo, talks to daemon) |
 | `waybar.go` | Waybar module — `--waybar` JSON output + `--setup`/`--remove` config management |
 | `styles.go` | Semantic color variables + all lipgloss styles (initialized by `initStyles()`) |
 | `theme.go` | ANSI terminal color assignments → `initColors()` → `initStyles()` |
@@ -63,6 +64,11 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 - Multiple tunnels may be active at once; connecting only tears down active tunnels whose `AllowedIPs` overlap the new config's (unparseable/missing AllowedIPs are treated as overlapping, so full-tunnel switching is preserved)
 - NetBird row appears only when the `netbird` binary is installed; it coexists with WG tunnels (overlay mesh, not mutually exclusive)
 - `netbird up` is never run when the daemon reports NeedsLogin/SessionExpired — it would block on browser SSO
+- Cloudflare WARP row appears only when `warp-cli` is installed (`cloudflare-warp-bin`); needs the `warp-svc` daemon running (no sudo for warp-cli itself)
+- WARP status is parsed from `warp-cli status` **text** (`Status update: <State>`), not `-j` JSON — the JSON schema is undocumented and drifts between releases; the text line is stable
+- `warp-cli connect` is never auto-run when the daemon is down or the client is unregistered (`warp-cli registration show` fails) — registration/Teams SSO is left to the user, mirroring the NetBird guard
+- WARP is a **full-device tunnel** (unlike NetBird's overlay): it can collide with a WG tunnel on routing/DNS. The tool warns at connect time but does **not** auto-disconnect — split-tunnel setups are legitimate
+- WARP transfer stats are not shown yet — `warp-cli stats` output format is unverified; pin it from a live connected capture before parsing (avoid guessed numbers)
 
 ## AUR Publishing
 

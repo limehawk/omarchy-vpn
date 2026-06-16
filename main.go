@@ -61,6 +61,12 @@ func printWaybarStatus() {
 		}
 	}
 
+	if WarpAvailable() {
+		if GetWarpStatus().Connected() {
+			parts = append(parts, "Cloudflare WARP: Connected")
+		}
+	}
+
 	if len(parts) > 0 {
 		out.Text = "󰦝"
 		out.Tooltip = strings.Join(parts, "\n")

@@ -43,6 +43,10 @@ type model struct {
 	netbirdAvail  bool
 	netbirdStatus NetBirdStatus
 
+	// WARP state (only meaningful when warpAvail is true)
+	warpAvail  bool
+	warpStatus WarpStatus
+
 	// Modal state
 	modal       modalState
 	renameInput textinput.Model
@@ -60,28 +64,48 @@ type model struct {
 	messageExp time.Time // when to clear the message
 }
 
-// listLen returns the number of rows in the left panel list, including the
-// pinned NetBird row when present.
-func (m model) listLen() int {
-	n := len(m.configs)
+// pinnedCount returns the number of pinned daemon rows above the WireGuard
+// configs. Row order is fixed: NetBird first, then WARP.
+func (m model) pinnedCount() int {
+	n := 0
 	if m.netbirdAvail {
+		n++
+	}
+	if m.warpAvail {
 		n++
 	}
 	return n
 }
 
-// netbirdSelected reports whether the cursor is on the pinned NetBird row.
+// listLen returns the number of rows in the left panel list, including any
+// pinned daemon rows (NetBird, WARP) when present.
+func (m model) listLen() int {
+	return m.pinnedCount() + len(m.configs)
+}
+
+// netbirdSelected reports whether the cursor is on the pinned NetBird row,
+// which is always row 0 when NetBird is available.
 func (m model) netbirdSelected() bool {
 	return m.netbirdAvail && m.cursor == 0
 }
 
-// selectedConfig returns the WireGuard config under the cursor, or "" if the
-// cursor is on the NetBird row or the list is empty.
-func (m model) selectedConfig() string {
-	i := m.cursor
-	if m.netbirdAvail {
-		i--
+// warpSelected reports whether the cursor is on the pinned WARP row, which
+// sits just below the NetBird row (or at row 0 when NetBird is absent).
+func (m model) warpSelected() bool {
+	if !m.warpAvail {
+		return false
 	}
+	row := 0
+	if m.netbirdAvail {
+		row = 1
+	}
+	return m.cursor == row
+}
+
+// selectedConfig returns the WireGuard config under the cursor, or "" if the
+// cursor is on a pinned daemon row or the list is empty.
+func (m model) selectedConfig() string {
+	i := m.cursor - m.pinnedCount()
 	if i < 0 || i >= len(m.configs) {
 		return ""
 	}
@@ -108,8 +132,9 @@ func (m *model) refreshVPNState() {
 // Messages
 
 type connectDoneMsg struct {
-	name string
-	err  error
+	name         string
+	err          error
+	warpConflict bool // WARP was up when this WG tunnel connected
 }
 
 type disconnectDoneMsg struct {
@@ -120,6 +145,12 @@ type disconnectDoneMsg struct {
 type netbirdDoneMsg struct {
 	up  bool // true for `netbird up`, false for `netbird down`
 	err error
+}
+
+type warpDoneMsg struct {
+	up         bool   // true for `warp-cli connect`, false for `warp-cli disconnect`
+	err        error
+	wgConflict string // active WG tunnel name when connecting, "" if none
 }
 
 type importDoneMsg struct {
@@ -182,6 +213,10 @@ func initialModel() model {
 	if m.netbirdAvail {
 		m.netbirdStatus, _ = GetNetBirdStatus()
 	}
+	m.warpAvail = WarpAvailable()
+	if m.warpAvail {
+		m.warpStatus = GetWarpStatus()
+	}
 	return m
 }
 
@@ -202,6 +237,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.netbirdAvail {
 			m.netbirdStatus, _ = GetNetBirdStatus()
 		}
+		if m.warpAvail {
+			m.warpStatus = GetWarpStatus()
+		}
 		configs := ListConfigs()
 		if len(configs) != len(m.configs) {
 			m.configs = configs
@@ -217,7 +255,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.setMessage(errorStyle.Render("  " + msg.err.Error()))
 		} else {
-			m.setMessage(connectedStyle.Render("  Connected to " + msg.name))
+			text := connectedStyle.Render("  Connected to " + msg.name)
+			if msg.warpConflict {
+				text += warnStyle.Render("  ⚠ Cloudflare WARP is up; may conflict")
+			}
+			m.setMessage(text)
 		}
 		m.configs = ListConfigs()
 		return m, nil
@@ -242,6 +284,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setMessage(connectedStyle.Render("  NetBird connected"))
 		} else {
 			m.setMessage(dimStyle.Render("  NetBird disconnected"))
+		}
+		return m, nil
+
+	case warpDoneMsg:
+		m.modal = modalNone
+		if m.warpAvail {
+			m.warpStatus = GetWarpStatus()
+		}
+		switch {
+		case msg.err != nil:
+			m.setMessage(errorStyle.Render("  Cloudflare WARP: " + msg.err.Error()))
+		case msg.up:
+			text := connectedStyle.Render("  Cloudflare WARP connected")
+			if msg.wgConflict != "" {
+				text += warnStyle.Render("  ⚠ WG tunnel '" + msg.wgConflict + "' is up; may conflict")
+			}
+			m.setMessage(text)
+		default:
+			m.setMessage(dimStyle.Render("  Cloudflare WARP disconnected"))
 		}
 		return m, nil
 
@@ -350,6 +411,9 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.netbirdSelected() {
 			return m.connectNetbird()
 		}
+		if m.warpSelected() {
+			return m.connectWarp()
+		}
 		selected := m.selectedConfig()
 		if selected == "" {
 			break
@@ -361,6 +425,7 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.modal = modalConnecting
 		m.connectName = selected
 		active := slices.Clone(m.activeVPNs)
+		warpUp := m.warpAvail && m.warpStatus.Connected()
 		return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
 			// Only tunnels whose AllowedIPs overlap the new config need to
 			// come down first; disjoint tunnels stay connected alongside it.
@@ -370,7 +435,7 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 			err := ConnectVPN(selected)
-			return connectDoneMsg{name: selected, err: err}
+			return connectDoneMsg{name: selected, err: err, warpConflict: warpUp}
 		})
 
 	case key.Matches(msg, m.keys.Disconnect):
@@ -380,6 +445,14 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, func() tea.Msg {
 				return netbirdDoneMsg{up: false, err: NetBirdDown()}
+			}
+		}
+		if m.warpSelected() {
+			if !m.warpStatus.Connected() {
+				break
+			}
+			return m, func() tea.Msg {
+				return warpDoneMsg{up: false, err: WarpDown()}
 			}
 		}
 		var name string
@@ -410,6 +483,10 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.setMessage(warnStyle.Render("  NetBird is managed by its own daemon"))
 			break
 		}
+		if m.warpSelected() {
+			m.setMessage(warnStyle.Render("  Cloudflare WARP is managed by its own daemon"))
+			break
+		}
 		selected := m.selectedConfig()
 		if selected == "" {
 			break
@@ -428,6 +505,10 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Delete):
 		if m.netbirdSelected() {
 			m.setMessage(warnStyle.Render("  NetBird is managed by its own daemon"))
+			break
+		}
+		if m.warpSelected() {
+			m.setMessage(warnStyle.Render("  Cloudflare WARP is managed by its own daemon"))
 			break
 		}
 		selected := m.selectedConfig()
@@ -461,6 +542,27 @@ func (m *model) connectNetbird() (tea.Model, tea.Cmd) {
 	m.connectName = netbirdRowName
 	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
 		return netbirdDoneMsg{up: true, err: NetBirdUp()}
+	})
+}
+
+func (m *model) connectWarp() (tea.Model, tea.Cmd) {
+	if m.warpStatus.Connected() {
+		m.setMessage(dimStyle.Render("  Already connected"))
+		return m, nil
+	}
+	if m.warpStatus.DaemonDown {
+		m.setMessage(warnStyle.Render("  warp-svc not running — sudo systemctl enable --now warp-svc"))
+		return m, nil
+	}
+	if m.warpStatus.NeedsRegistration() {
+		m.setMessage(warnStyle.Render("  Cloudflare WARP needs registration — enroll in a terminal"))
+		return m, nil
+	}
+	m.modal = modalConnecting
+	m.connectName = warpRowName
+	wgConflict := strings.Join(m.activeVPNs, ", ")
+	return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
+		return warpDoneMsg{up: true, err: WarpUp(), wgConflict: wgConflict}
 	})
 }
 

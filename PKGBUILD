@@ -7,6 +7,8 @@ arch=('x86_64')
 url="https://github.com/limehawk/omarchy-vpn"
 license=('MIT')
 depends=('wireguard-tools' 'systemd-resolvconf')
+optdepends=('netbird: NetBird mesh VPN row'
+            'cloudflare-warp-bin: Cloudflare WARP row')
 makedepends=('go')
 install=omarchy-vpn.install
 

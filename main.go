@@ -9,9 +9,25 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+// version is the build version, injected via -ldflags "-X main.version=$pkgver".
+// Plain `go build` leaves it as "dev".
+var version = "dev"
+
+// displayVersion renders the version for humans: "v0.1.0" for releases, "dev"
+// for un-stamped builds.
+func displayVersion() string {
+	if version == "dev" {
+		return "dev"
+	}
+	return "v" + version
+}
+
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
+		case "--version", "-v":
+			fmt.Println("omarchy-vpn " + displayVersion())
+			return
 		case "--waybar":
 			printWaybarStatus()
 			return

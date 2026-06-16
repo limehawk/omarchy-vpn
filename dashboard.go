@@ -26,7 +26,7 @@ func (m model) View() tea.View {
 		overlay := helpOverlayStyle.Render(
 			helpTitleStyle.Render("󰋖  Keyboard Shortcuts") + "\n\n" +
 				helpView + "\n\n" +
-				dimStyle.Render("Press any key to close"),
+				dimStyle.Render("omarchy-vpn "+displayVersion()+" · Press any key to close"),
 		)
 		v := tea.NewView(lipgloss.Place(
 			m.width, m.height,
@@ -83,6 +83,7 @@ func (m model) View() tea.View {
 func (m model) renderTitleBar() string {
 	icon := titleStyle.Render("󰖂 ")
 	name := titleStyle.Render("omarchy-vpn")
+	ver := titleAccentStyle.Render(" " + displayVersion())
 
 	sep := titleAccentStyle.Render("  ─  ")
 	var badges []string
@@ -102,5 +103,5 @@ func (m model) renderTitleBar() string {
 		status = sep + dimStyle.Render("○ disconnected")
 	}
 
-	return " " + icon + name + status + "\n"
+	return " " + icon + name + ver + status + "\n"
 }

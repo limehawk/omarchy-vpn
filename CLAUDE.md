@@ -7,8 +7,10 @@ WireGuard VPN manager TUI for Omarchy (Arch Linux + Hyprland). Single-screen das
 ```bash
 makepkg -si          # Build package and install via pacman (installs deps + sudoers)
 makepkg -fs          # Rebuild after code changes (-f forces, -s resolves deps)
-go build -o omarchy-vpn .  # Build binary only (no package/sudoers)
+go build -o omarchy-vpn .  # Build binary only (no package/sudoers) — version shows as "dev"
 ```
+
+The displayed version comes from `main.version`, injected at build time via `go build -ldflags "-X main.version=$pkgver"` (see PKGBUILD `build()`). Plain `go build` leaves it `dev`. Surfaced in the title bar, the `?` help overlay, and `omarchy-vpn --version`. **Single source of truth is the PKGBUILD `pkgver`** — there is no version constant in the Go code to bump.
 
 ## Stack
 
@@ -95,6 +97,8 @@ curl -sL "https://github.com/limehawk/omarchy-vpn/archive/v0.X.X.tar.gz" | sha25
 git clone ssh://aur@aur.archlinux.org/omarchy-vpn.git /tmp/omarchy-vpn-aur
 
 # 4. Update PKGBUILD: bump pkgver + sha256sums
+#    NOTE: the AUR PKGBUILD's build() must also pass
+#    -ldflags "-X main.version=$pkgver" or the AUR package shows version "dev".
 # 5. Regenerate .SRCINFO
 cd /tmp/omarchy-vpn-aur
 makepkg --printsrcinfo > .SRCINFO

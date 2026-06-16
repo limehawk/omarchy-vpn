@@ -14,7 +14,7 @@ install=omarchy-vpn.install
 
 build() {
     cd "$startdir"
-    go build -o "$srcdir/omarchy-vpn" .
+    go build -ldflags "-X main.version=$pkgver" -o "$srcdir/omarchy-vpn" .
 }
 
 package() {

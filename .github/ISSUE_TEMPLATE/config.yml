@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🎨 Theme request
+    url: https://github.com/limehawk/omarchy-vpn/discussions/new?category=theme-request
+    about: omarchy-vpn looks off under a theme? Request it in Discussions.
+  - name: 💡 Feature idea
+    url: https://github.com/limehawk/omarchy-vpn/discussions/new?category=ideas
+    about: Suggest a new feature or improvement.
+  - name: ❓ Question / setup help
+    url: https://github.com/limehawk/omarchy-vpn/discussions/new?category=q-a
+    about: Stuck on install, sudo, DNS, or NetBird? Ask in Q&A.
+  - name: 🙌 Show & tell
+    url: https://github.com/limehawk/omarchy-vpn/discussions/new?category=show-and-tell
+    about: Share your setup, theme, or config.

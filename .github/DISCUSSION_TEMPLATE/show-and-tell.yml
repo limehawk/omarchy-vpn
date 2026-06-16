@@ -1,0 +1,24 @@
+title: "[Show & Tell] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Show off your setup — omarchy-vpn under your favorite theme, a slick
+        multi-tunnel config, a NetBird mesh, whatever you've got going.
+  - type: textarea
+    id: showcase
+    attributes:
+      label: What are you sharing?
+      description: A sentence or two on what we're looking at.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag an image in. This is the fun part.
+  - type: input
+    id: theme
+    attributes:
+      label: Theme
+      placeholder: e.g. Tokyo Night

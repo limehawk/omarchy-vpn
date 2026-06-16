@@ -1,0 +1,44 @@
+title: "[Help] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Stuck on setup or something not working? Ask here. Once it's answered,
+        mark the reply as the answer so the next person finds it fast.
+
+        **Found a bug?** Open an [Issue](../../issues/new/choose) instead — bugs
+        are tracked there so they can be closed when fixed.
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to do?
+      description: Describe what you want to happen and what's happening instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: What's it about?
+      options:
+        - Install / build (makepkg, AUR)
+        - Connecting / disconnecting a tunnel
+        - Importing a config
+        - sudo / permissions
+        - DNS / resolvconf
+        - NetBird
+        - Waybar module
+        - Theming / colors
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+      description: Commands you ran, errors you saw. Paste output in a code block (```).
+  - type: input
+    id: version
+    attributes:
+      label: omarchy-vpn version
+      description: Output of `omarchy-vpn --version`, or your package version.
+      placeholder: e.g. 0.2.0

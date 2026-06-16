@@ -1,0 +1,63 @@
+name: Bug report
+description: Something is broken or behaving wrong
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. This tracker is for **bugs**. For theme requests,
+        setup help, or showing off your setup, use
+        [Discussions](../../discussions) instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open omarchy-vpn
+        2. Select '...'
+        3. Press '...'
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error output
+      description: Paste any error text. wg-quick errors, panics, the message in the help bar.
+      render: shell
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where is it?
+      options:
+        - Config list / connecting
+        - Status panel
+        - Importing a config
+        - sudo / permissions
+        - DNS / resolvconf
+        - NetBird
+        - Waybar module
+        - Theming / colors
+        - Build / install (makepkg, AUR)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: omarchy-vpn version
+      placeholder: e.g. 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: install-method
+    attributes:
+      label: How did you install it?
+      placeholder: e.g. AUR (yay), makepkg -si, go build

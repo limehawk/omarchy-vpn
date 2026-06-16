@@ -1,0 +1,54 @@
+title: "[Theme] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Want omarchy-vpn to look right under a specific theme? File it here.
+
+        omarchy-vpn doesn't ship its own palette — it uses your terminal's ANSI
+        colors (0–8), so it follows whatever omarchy theme is active. If something
+        looks wrong, it's usually a contrast/mapping issue rather than a missing
+        theme. Fill this out and we'll take a look.
+  - type: input
+    id: theme-name
+    attributes:
+      label: Theme name
+      description: Which omarchy theme is active?
+      placeholder: e.g. Tokyo Night, Catppuccin, Gruvbox, Nord
+    validations:
+      required: true
+  - type: dropdown
+    id: ships-with-omarchy
+    attributes:
+      label: Does this theme ship with omarchy?
+      options:
+        - "Yes — built-in omarchy theme"
+        - "No — third-party / custom theme"
+        - "Not sure"
+    validations:
+      required: true
+  - type: input
+    id: theme-link
+    attributes:
+      label: Link to the theme
+      description: Repo or omarchy theme URL, if it's third-party or custom.
+      placeholder: https://github.com/...
+  - type: textarea
+    id: whats-wrong
+    attributes:
+      label: What looks wrong?
+      description: What's hard to read or off? Which panel — config list, status panel, title bar, help bar?
+      placeholder: e.g. The connected/disconnected dot is invisible against the background.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag an image in. A picture of the TUI under this theme is worth a thousand words.
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal emulator
+      description: Colors are mapped by your terminal, so this matters.
+      placeholder: e.g. Alacritty, foot, kitty, ghostty

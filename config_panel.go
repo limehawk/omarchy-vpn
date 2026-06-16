@@ -28,7 +28,11 @@ func (m model) renderConfigPanel(width, height int) string {
 		lines = append(lines, "") // top padding
 		idx := 0
 		if m.netbirdAvail {
-			lines = append(lines, m.renderNetbirdItem(idx, width-4))
+			lines = append(lines, m.renderPinnedItem(netbirdRowName, m.netbirdStatus.Connected(), idx, width-4))
+			idx++
+		}
+		if m.warpAvail {
+			lines = append(lines, m.renderPinnedItem(warpRowName, m.warpStatus.Connected(), idx, width-4))
 			idx++
 		}
 		for _, cfg := range m.configs {
@@ -54,7 +58,7 @@ func (m model) renderConfigPanel(width, height int) string {
 
 	// Choose border style based on connection state
 	border := activeBorderStyle
-	if len(m.activeVPNs) > 0 || m.netbirdStatus.Connected() {
+	if len(m.activeVPNs) > 0 || m.netbirdStatus.Connected() || m.warpStatus.Connected() {
 		border = connectedBorderStyle
 	}
 
@@ -104,26 +108,29 @@ func (m model) renderConfigItem(name string, index, maxWidth int) string {
 	return parts.String()
 }
 
-func (m model) renderNetbirdItem(index, maxWidth int) string {
+// renderPinnedItem renders a pinned daemon row (NetBird, WARP) — same shape as
+// a config row but driven by an explicit name and connected state rather than
+// the WireGuard active-VPN tracking.
+func (m model) renderPinnedItem(name string, connected bool, index, maxWidth int) string {
 	isSelected := index == m.cursor
 
-	if isSelected && m.modal == modalConnecting && m.connectName == netbirdRowName {
+	if isSelected && m.modal == modalConnecting && m.connectName == name {
 		return "  " + selectedItemStyle.Render("▸ ") +
 			m.spinner.View() + " " +
-			selectedItemStyle.Render(netbirdRowName)
+			selectedItemStyle.Render(name)
 	}
 
 	var parts strings.Builder
 	if isSelected {
 		parts.WriteString("  ")
 		parts.WriteString(selectedItemStyle.Render("▸ "))
-		parts.WriteString(selectedItemStyle.Render(netbirdRowName))
+		parts.WriteString(selectedItemStyle.Render(name))
 	} else {
 		parts.WriteString("    ")
-		parts.WriteString(itemStyle.Render(netbirdRowName))
+		parts.WriteString(itemStyle.Render(name))
 	}
 
-	if m.netbirdStatus.Connected() {
+	if connected {
 		parts.WriteString(" ")
 		parts.WriteString(connectedIndicator)
 	}

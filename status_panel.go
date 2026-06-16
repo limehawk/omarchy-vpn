@@ -61,6 +61,9 @@ func (m model) renderStatusPanel(width, height int) string {
 	if m.netbirdSelected() {
 		return m.renderNetbirdStatusPanel(width, height)
 	}
+	if m.warpSelected() {
+		return m.renderWarpStatusPanel(width, height)
+	}
 
 	innerWidth := width - 4 // border + padding
 	contentHeight := height - 2
@@ -209,6 +212,60 @@ func (m model) renderNetbirdStatusPanel(width, height int) string {
 		if s.MgmtURL != "" {
 			lines = append(lines, renderField("󰖟", "Management", s.MgmtURL, innerWidth))
 		}
+	}
+
+	for len(lines) < contentHeight {
+		lines = append(lines, "")
+	}
+	if len(lines) > contentHeight {
+		lines = lines[:contentHeight]
+	}
+
+	return border.
+		Width(width - 2).
+		Height(contentHeight).
+		Render(strings.Join(lines, "\n"))
+}
+
+func (m model) renderWarpStatusPanel(width, height int) string {
+	innerWidth := width - 4
+	contentHeight := height - 2
+
+	var lines []string
+	var border lipgloss.Style
+	s := m.warpStatus
+
+	lines = append(lines, "")
+
+	switch {
+	case s.Connected():
+		border = connectedBorderStyle
+		badge := lipgloss.NewStyle().
+			Foreground(green).
+			Bold(true).
+			Render("  ● Connected")
+		lines = append(lines, badge, "")
+		lines = append(lines, renderField("󰖟", "Provider", "Cloudflare WARP", innerWidth))
+
+	case s.DaemonDown:
+		border = inactiveBorderStyle
+		lines = append(lines, dimStyle.Render("  ○ Daemon not running"), "")
+		lines = append(lines, dimStyle.Render("  sudo systemctl enable --now warp-svc"))
+
+	case s.NeedsRegistration():
+		border = inactiveBorderStyle
+		lines = append(lines, warnStyle.Render("  ○ Registration required"), "")
+		lines = append(lines, dimStyle.Render("  Run `warp-cli registration new`, or enroll via"))
+		lines = append(lines, dimStyle.Render("  your Zero Trust org, in a terminal."))
+
+	case s.Connecting():
+		border = inactiveBorderStyle
+		lines = append(lines, dimStyle.Render("  ○ Connecting…"))
+
+	default: // Disconnected, No network, or unknown future states
+		border = inactiveBorderStyle
+		lines = append(lines, dimStyle.Render("  ○ Not connected"), "")
+		lines = append(lines, dimStyle.Render("  Press enter to connect."))
 	}
 
 	for len(lines) < contentHeight {

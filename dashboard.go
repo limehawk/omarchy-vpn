@@ -92,6 +92,9 @@ func (m model) renderTitleBar() string {
 	if m.netbirdStatus.Connected() {
 		badges = append(badges, connectedStyle.Render("● NetBird"))
 	}
+	if m.warpStatus.Connected() {
+		badges = append(badges, connectedStyle.Render("● Cloudflare WARP"))
+	}
 	var status string
 	if len(badges) > 0 {
 		status = sep + strings.Join(badges, "  ")

@@ -54,7 +54,7 @@ func (m model) renderConfigPanel(width, height int) string {
 
 	// Choose border style based on connection state
 	border := activeBorderStyle
-	if m.activeVPN != "" || m.netbirdStatus.Connected() {
+	if len(m.activeVPNs) > 0 || m.netbirdStatus.Connected() {
 		border = connectedBorderStyle
 	}
 
@@ -65,7 +65,7 @@ func (m model) renderConfigPanel(width, height int) string {
 }
 
 func (m model) renderConfigItem(name string, index, maxWidth int) string {
-	isActive := name == m.activeVPN
+	isActive := m.isActive(name)
 	isSelected := index == m.cursor
 
 	// Handle inline modals

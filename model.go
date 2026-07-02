@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -35,8 +36,8 @@ type model struct {
 	cursor  int
 
 	// Connection state
-	activeVPN string
-	vpnStatus VPNStatus
+	activeVPNs []string
+	vpnStatus  map[string]VPNStatus
 
 	// NetBird state (only meaningful when netbirdAvail is true)
 	netbirdAvail  bool
@@ -87,6 +88,23 @@ func (m model) selectedConfig() string {
 	return m.configs[i]
 }
 
+// isActive reports whether the named config is a currently active tunnel.
+func (m model) isActive(name string) bool {
+	return name != "" && slices.Contains(m.activeVPNs, name)
+}
+
+// refreshVPNState re-queries the active tunnel list and per-tunnel stats.
+func (m *model) refreshVPNState() {
+	m.activeVPNs = GetActiveVPNs()
+	statuses := make(map[string]VPNStatus, len(m.activeVPNs))
+	for _, name := range m.activeVPNs {
+		if s, err := GetVPNStatus(name); err == nil {
+			statuses[name] = s
+		}
+	}
+	m.vpnStatus = statuses
+}
+
 // Messages
 
 type connectDoneMsg struct {
@@ -95,7 +113,8 @@ type connectDoneMsg struct {
 }
 
 type disconnectDoneMsg struct {
-	err error
+	name string
+	err  error
 }
 
 type netbirdDoneMsg struct {
@@ -157,7 +176,7 @@ func initialModel() model {
 		keys:        newKeyMap(),
 		help:        newHelp(),
 	}
-	m.activeVPN = GetActiveVPN()
+	m.refreshVPNState()
 	m.configs = ListConfigs()
 	m.netbirdAvail = NetBirdAvailable()
 	if m.netbirdAvail {
@@ -179,9 +198,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case statusTickMsg:
-		if m.activeVPN != "" {
-			m.vpnStatus, _ = GetVPNStatus(m.activeVPN)
-		}
+		m.refreshVPNState()
 		if m.netbirdAvail {
 			m.netbirdStatus, _ = GetNetBirdStatus()
 		}
@@ -196,23 +213,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case connectDoneMsg:
 		m.modal = modalNone
+		m.refreshVPNState()
 		if msg.err != nil {
 			m.setMessage(errorStyle.Render("  " + msg.err.Error()))
 		} else {
-			m.activeVPN = msg.name
-			m.vpnStatus, _ = GetVPNStatus(msg.name)
 			m.setMessage(connectedStyle.Render("  Connected to " + msg.name))
 		}
 		m.configs = ListConfigs()
 		return m, nil
 
 	case disconnectDoneMsg:
+		m.refreshVPNState()
 		if msg.err != nil {
 			m.setMessage(errorStyle.Render("  Disconnect failed: " + msg.err.Error()))
 		} else {
-			m.setMessage(dimStyle.Render("  Disconnected"))
-			m.activeVPN = ""
-			m.vpnStatus = VPNStatus{}
+			m.setMessage(dimStyle.Render("  Disconnected " + msg.name))
 		}
 		return m, nil
 
@@ -339,16 +354,18 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if selected == "" {
 			break
 		}
-		if selected == m.activeVPN {
+		if m.isActive(selected) {
 			m.setMessage(dimStyle.Render("  Already connected"))
 			break
 		}
 		m.modal = modalConnecting
 		m.connectName = selected
-		activeVPN := m.activeVPN
+		active := slices.Clone(m.activeVPNs)
 		return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-			if activeVPN != "" {
-				if err := DisconnectVPN(activeVPN); err != nil {
+			// Only tunnels whose AllowedIPs overlap the new config need to
+			// come down first; disjoint tunnels stay connected alongside it.
+			for _, name := range conflictingVPNs(selected, active) {
+				if err := DisconnectVPN(name); err != nil {
 					return connectDoneMsg{name: selected, err: err}
 				}
 			}
@@ -365,13 +382,21 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return netbirdDoneMsg{up: false, err: NetBirdDown()}
 			}
 		}
-		if m.activeVPN == "" {
+		var name string
+		if sel := m.selectedConfig(); m.isActive(sel) {
+			name = sel
+		} else if len(m.activeVPNs) == 1 {
+			name = m.activeVPNs[0]
+		}
+		if name == "" {
+			if len(m.activeVPNs) > 1 {
+				m.setMessage(warnStyle.Render("  Select the tunnel to disconnect"))
+			}
 			break
 		}
-		active := m.activeVPN
 		return m, func() tea.Msg {
-			err := DisconnectVPN(active)
-			return disconnectDoneMsg{err: err}
+			err := DisconnectVPN(name)
+			return disconnectDoneMsg{name: name, err: err}
 		}
 
 	case key.Matches(msg, m.keys.Import):
@@ -389,7 +414,7 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if selected == "" {
 			break
 		}
-		if selected == m.activeVPN {
+		if m.isActive(selected) {
 			m.setMessage(warnStyle.Render("  Disconnect before renaming"))
 			break
 		}
@@ -409,7 +434,7 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if selected == "" {
 			break
 		}
-		if selected == m.activeVPN {
+		if m.isActive(selected) {
 			m.setMessage(warnStyle.Render("  Disconnect before deleting"))
 			break
 		}

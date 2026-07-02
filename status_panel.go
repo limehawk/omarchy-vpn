@@ -11,10 +11,11 @@ import (
 
 // ConfigInfo holds static config details parsed from a .conf file.
 type ConfigInfo struct {
-	Address  string
-	DNS      string
-	Endpoint string
-	PeerKey  string
+	Address    string
+	DNS        string
+	Endpoint   string
+	PeerKey    string
+	AllowedIPs []string // one entry per AllowedIPs line, possibly comma-separated
 }
 
 // ParseConfigFile reads a WireGuard .conf file and extracts display fields.
@@ -49,6 +50,8 @@ func ParseConfigFile(name string) ConfigInfo {
 			info.Endpoint = val
 		case "PublicKey":
 			info.PeerKey = val
+		case "AllowedIPs":
+			info.AllowedIPs = append(info.AllowedIPs, val)
 		}
 	}
 	return info
@@ -65,12 +68,12 @@ func (m model) renderStatusPanel(width, height int) string {
 	var lines []string
 	var border lipgloss.Style
 
-	if m.activeVPN != "" {
+	if name := m.selectedConfig(); name != "" && m.isActive(name) {
 		border = connectedBorderStyle
 
 		lines = append(lines, "")
 
-		s := m.vpnStatus
+		s := m.vpnStatus[name]
 
 		// Connection badge
 		badge := lipgloss.NewStyle().
@@ -84,7 +87,7 @@ func (m model) renderStatusPanel(width, height int) string {
 			lines = append(lines, renderField("󰖟", "Endpoint", s.Endpoint, innerWidth))
 		}
 
-		info := ParseConfigFile(m.activeVPN)
+		info := ParseConfigFile(name)
 		if info.Address != "" {
 			lines = append(lines, renderField("󰩟", "Address", info.Address, innerWidth))
 		}
@@ -99,10 +102,10 @@ func (m model) renderStatusPanel(width, height int) string {
 		}
 
 		lines = append(lines, "")
-		lines = append(lines, renderField("󰈔", "Config", m.activeVPN, innerWidth))
-		lines = append(lines, renderField("󰉋", "Path", fmt.Sprintf("/etc/wireguard/%s.conf", m.activeVPN), innerWidth))
+		lines = append(lines, renderField("󰈔", "Config", name, innerWidth))
+		lines = append(lines, renderField("󰉋", "Path", fmt.Sprintf("/etc/wireguard/%s.conf", name), innerWidth))
 
-	} else if name := m.selectedConfig(); name != "" {
+	} else if name != "" {
 		// Static preview of highlighted config
 		border = inactiveBorderStyle
 

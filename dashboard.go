@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -38,7 +39,7 @@ func (m model) View() tea.View {
 
 	// Layout: title bar (1) + gap (1) + panels + gap (1) + bottom bar (1)
 	titleBar := m.renderTitleBar()
-	titleHeight := 2 // title + gap
+	titleHeight := 2  // title + gap
 	bottomHeight := 2 // gap + shortcuts
 	panelHeight := m.height - titleHeight - bottomHeight
 	if panelHeight < 5 {
@@ -84,18 +85,19 @@ func (m model) renderTitleBar() string {
 	name := titleStyle.Render("omarchy-vpn")
 
 	sep := titleAccentStyle.Render("  ─  ")
+	var badges []string
+	for _, vpn := range m.activeVPNs {
+		badges = append(badges, connectedStyle.Render("● "+vpn))
+	}
+	if m.netbirdStatus.Connected() {
+		badges = append(badges, connectedStyle.Render("● NetBird"))
+	}
 	var status string
-	switch {
-	case m.activeVPN != "" && m.netbirdStatus.Connected():
-		status = sep + connectedStyle.Render("● "+m.activeVPN) + "  " + connectedStyle.Render("● NetBird")
-	case m.activeVPN != "":
-		status = sep + connectedStyle.Render("● "+m.activeVPN)
-	case m.netbirdStatus.Connected():
-		status = sep + connectedStyle.Render("● NetBird")
-	default:
+	if len(badges) > 0 {
+		status = sep + strings.Join(badges, "  ")
+	} else {
 		status = sep + dimStyle.Render("○ disconnected")
 	}
 
 	return " " + icon + name + status + "\n"
 }
-

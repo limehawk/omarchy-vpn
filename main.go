@@ -47,8 +47,7 @@ func printWaybarStatus() {
 
 	var parts []string
 
-	iface := GetActiveVPN()
-	if iface != "" {
+	for _, iface := range GetActiveVPNs() {
 		if status, err := GetVPNStatus(iface); err == nil {
 			parts = append(parts, fmt.Sprintf("VPN: %s\nEndpoint: %s\nTransfer: %s / %s",
 				iface, status.Endpoint, status.TransferRx, status.TransferTx))

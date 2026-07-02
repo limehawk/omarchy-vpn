@@ -25,6 +25,7 @@
 - **Single-screen dashboard** — two-panel layout, no menus to navigate
 - **Live connection stats** — endpoint, transfer, handshake refreshing every second
 - **Config preview** — highlight a config to see its details before connecting
+- **Multiple tunnels** — connect to several sites at once when their AllowedIPs don't overlap; overlapping configs (e.g. two full tunnels) switch automatically
 - **Inline operations** — rename and delete configs without leaving the dashboard
 - **Built-in file picker** — browse and import `.conf` / `.wg` files natively
 - **Catppuccin Mocha** — terminal colors with nerd font icons
@@ -76,7 +77,7 @@ That's the whole interface. Everything happens on one screen.
 | Key | Action |
 |-----|--------|
 | `Enter` | Connect to selected config |
-| `d` | Disconnect active VPN |
+| `d` | Disconnect selected tunnel |
 
 ### Config Management
 
@@ -123,6 +124,8 @@ omarchy-vpn --remove-waybar   # Remove module from waybar config + style
 omarchy-vpn is a TUI wrapper around `wg-quick` and `wg show`. Configs live in `/etc/wireguard/` as standard WireGuard `.conf` files. The app manages them with passwordless sudo via a sudoers file installed by the package.
 
 Connect runs `wg-quick up <config>`. Disconnect runs `wg-quick down <config>`. The VPN runs in the kernel — closing the TUI doesn't affect your connection.
+
+Multiple tunnels can be active at once. When you connect to a config, only active tunnels whose `AllowedIPs` overlap the new config's routes are brought down first — tunnels routing disjoint subnets stay connected. Two full-tunnel configs (`0.0.0.0/0`) always overlap, so connecting one switches away from the other, same as before.
 
 ## Requirements
 

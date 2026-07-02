@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"os/exec"
 	"slices"
@@ -29,21 +30,22 @@ type VPNStatus struct {
 	Handshake  string
 }
 
-// GetActiveVPN returns the first active WireGuard interface that
-// corresponds to a config in /etc/wireguard/. Foreign interfaces from
+// GetActiveVPNs returns all active WireGuard interfaces that
+// correspond to configs in /etc/wireguard/. Foreign interfaces from
 // other WireGuard apps (NetBird, Tailscale, etc.) are ignored.
-func GetActiveVPN() string {
+func GetActiveVPNs() []string {
 	out, err := exec.Command("sudo", "wg", "show", "interfaces").Output()
 	if err != nil {
-		return ""
+		return nil
 	}
 	managed := ListConfigs()
+	var active []string
 	for _, iface := range strings.Fields(string(out)) {
 		if isValidConfigName(iface) && slices.Contains(managed, iface) {
-			return iface
+			active = append(active, iface)
 		}
 	}
-	return ""
+	return active
 }
 
 func ListConfigs() []string {
@@ -142,6 +144,60 @@ func RenameConfig(oldName, newName string) error {
 		return err
 	}
 	return nil
+}
+
+// parseAllowedIPs converts raw AllowedIPs values (each possibly a
+// comma-separated list) into masked prefixes. Bare addresses become
+// single-address prefixes; unparseable entries are skipped.
+func parseAllowedIPs(vals []string) []netip.Prefix {
+	var prefixes []netip.Prefix
+	for _, v := range vals {
+		for _, part := range strings.Split(v, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			if p, err := netip.ParsePrefix(part); err == nil {
+				prefixes = append(prefixes, p.Masked())
+			} else if a, err := netip.ParseAddr(part); err == nil {
+				prefixes = append(prefixes, netip.PrefixFrom(a, a.BitLen()))
+			}
+		}
+	}
+	return prefixes
+}
+
+// allowedIPsOverlap reports whether two AllowedIPs sets route any of the
+// same address space. Configs whose AllowedIPs are missing or entirely
+// unparseable are treated as overlapping, so the safe switch behavior
+// (disconnect first) applies when routes can't be compared.
+func allowedIPsOverlap(a, b []string) bool {
+	pa, pb := parseAllowedIPs(a), parseAllowedIPs(b)
+	if len(pa) == 0 || len(pb) == 0 {
+		return true
+	}
+	for _, x := range pa {
+		for _, y := range pb {
+			if x.Overlaps(y) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// conflictingVPNs returns the active tunnels whose AllowedIPs overlap the
+// named config's AllowedIPs. These must come down before the config can go
+// up; tunnels with disjoint routes can stay connected alongside it.
+func conflictingVPNs(name string, active []string) []string {
+	target := ParseConfigFile(name).AllowedIPs
+	var conflicts []string
+	for _, a := range active {
+		if allowedIPsOverlap(target, ParseConfigFile(a).AllowedIPs) {
+			conflicts = append(conflicts, a)
+		}
+	}
+	return conflicts
 }
 
 func ValidateConfig(path string) bool {

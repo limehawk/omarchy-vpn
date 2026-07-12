@@ -65,7 +65,7 @@ func newKeyMap() keyMap {
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Connect, k.Disconnect, k.Import, k.Help, k.Quit}
+	return []key.Binding{k.Connect, k.Disconnect, k.Import, k.Rename, k.Delete, k.Help, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
@@ -87,7 +87,5 @@ func newHelp() help.Model {
 	s.FullDesc = lipgloss.NewStyle().Foreground(textCol)
 	s.FullSeparator = lipgloss.NewStyle().Foreground(borderCol)
 	h.Styles = s
-	h.ShortSeparator = " │ "
-	h.FullSeparator = " │ "
 	return h
 }

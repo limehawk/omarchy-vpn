@@ -117,6 +117,8 @@ git commit -m "Update to 0.X.X: description"
 git push
 ```
 
+**Lesson from #39:** GitHub regenerates `/archive/` tarballs on demand and their bytes can change at any time, so a pinned `sha256sum` against them will eventually break every fresh install. Keep the AUR `source=` on `git+https://...#tag=v$pkgver` with `SKIP`; the tag pins the exact commit, which is the real integrity guarantee. After every AUR push, verify from a clean clone (`git clone https://aur.archlinux.org/omarchy-vpn.git && makepkg -f`) and bump `pkgrel`, not `pkgver`, for packaging-only fixes.
+
 
 ## Theming
 

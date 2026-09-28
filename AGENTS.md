@@ -78,13 +78,13 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 
 ## AUR Publishing
 
-Origin is private. GitHub is a push mirror. AUR is a **separate git server** — tarball PKGBUILD only.
+Origin is private. GitHub is a push mirror. AUR is a **separate git server** — git-source PKGBUILD only.
 
 | Repo | URL | Contents |
 |------|-----|----------|
 | Origin | private | Source of truth |
-| GitHub | `github.com/limehawk/omarchy-vpn` | Push mirror (AUR tarball host) |
-| AUR | `aur.archlinux.org/omarchy-vpn.git` | Tarball PKGBUILD + `.SRCINFO` + `.install` only |
+| GitHub | `github.com/limehawk/omarchy-vpn` | Push mirror (AUR builds from its tags) |
+| AUR | `aur.archlinux.org/omarchy-vpn.git` | Git-source PKGBUILD + `.SRCINFO` + `.install` only |
 
 **AUR SSH:** Requires an SSH key registered with AUR. See [AUR submission guidelines](https://wiki.archlinux.org/title/AUR_submission_guidelines).
 
@@ -97,13 +97,14 @@ git push && git push --tags
 fj release create v0.X.X -t v0.X.X
 gh release create v0.X.X
 
-# 2. Get new tarball checksum (AUR still fetches the GitHub archive)
-curl -sL "https://github.com/limehawk/omarchy-vpn/archive/v0.X.X.tar.gz" | sha256sum
+# 2. AUR PKGBUILD uses source=git+https://github.com/...#tag=v$pkgver with
+#    sha256sums=('SKIP'). No checksum step: GitHub archive tarballs are not
+#    byte-stable and broke installs before (#39). Do not go back to tarballs.
 
 # 3. Clone AUR repo (if not already cloned — /tmp is fine, it's throwaway)
 git clone ssh://aur@aur.archlinux.org/omarchy-vpn.git /tmp/omarchy-vpn-aur
 
-# 4. Update PKGBUILD: bump pkgver + sha256sums
+# 4. Update PKGBUILD: bump pkgver, reset pkgrel=1
 #    NOTE: the AUR PKGBUILD's build() must also pass
 #    -ldflags "-X main.version=$pkgver" or the AUR package shows version "dev".
 # 5. Regenerate .SRCINFO

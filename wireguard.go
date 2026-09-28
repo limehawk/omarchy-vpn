@@ -146,7 +146,8 @@ func ListConfigs() []string {
 	return configs
 }
 
-func ConnectVPN(name string) error {
+func ConnectVPN(name string) (err error) {
+	defer func() { logAction("connect", name, err) }()
 	if err := interfaceNameError(name); err != nil {
 		return err
 	}
@@ -161,7 +162,8 @@ func ConnectVPN(name string) error {
 	return nil
 }
 
-func DisconnectVPN(name string) error {
+func DisconnectVPN(name string) (err error) {
+	defer func() { logAction("disconnect", name, err) }()
 	if demoMode {
 		demoDisconnect(name)
 		return nil
@@ -216,7 +218,8 @@ func GetVPNStatus(name string) (VPNStatus, error) {
 	return status, nil
 }
 
-func ImportConfig(src, name string) error {
+func ImportConfig(src, name string) (err error) {
+	defer func() { logAction("import", name, err) }()
 	if err := interfaceNameError(name); err != nil {
 		return err
 	}
@@ -239,7 +242,8 @@ func ImportConfig(src, name string) error {
 	return nil
 }
 
-func RemoveConfig(name string) error {
+func RemoveConfig(name string) (err error) {
+	defer func() { logAction("delete", name, err) }()
 	if demoMode {
 		return nil
 	}
@@ -250,7 +254,8 @@ func RemoveConfig(name string) error {
 	return nil
 }
 
-func RenameConfig(oldName, newName string) error {
+func RenameConfig(oldName, newName string) (err error) {
+	defer func() { logAction("rename", oldName+" -> "+newName, err) }()
 	if err := interfaceNameError(newName); err != nil {
 		return err
 	}

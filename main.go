@@ -43,6 +43,9 @@ func main() {
 		}
 	}
 
+	if !demoMode {
+		initLog()
+	}
 	initColors()
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {

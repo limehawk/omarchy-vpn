@@ -135,6 +135,12 @@ Connect runs `wg-quick up <config>`. Disconnect runs `wg-quick down <config>`. T
 
 Multiple tunnels can be active at once. When you connect to a config, only active tunnels whose `AllowedIPs` overlap the new config's routes are brought down first — tunnels routing disjoint subnets stay connected. Two full-tunnel configs (`0.0.0.0/0`) always overlap, so connecting one switches away from the other, same as before.
 
+## Troubleshooting
+
+Every connect, disconnect, import, rename and delete is logged with its result to `~/.local/state/omarchy-vpn/omarchy-vpn.log` (config names and error messages only, never keys). Attach it when filing an issue. About 12 seconds after connecting, the app also checks that the server answered and warns you if it didn't.
+
+Changes to `/etc/wireguard` (imports, renames, deletes, each with the file's SHA-256) and anything the root helper refuses are written by root to the system journal: `journalctl -t omarchy-vpn _UID=0`. Filtering on `_UID=0` matters, because any user can write entries with that tag.
+
 ## Requirements
 
 - **Go 1.21+** (build only)

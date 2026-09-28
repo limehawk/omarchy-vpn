@@ -10,10 +10,17 @@ dir=/etc/wireguard
 
 die() { echo "$*" >&2; exit 1; }
 
+# Audit trail in the system journal (journalctl -t omarchy-vpn). Written by
+# root, so the user (or malware running as the user) cannot edit it. sudo
+# already logs every call; this adds what happened and why it was refused.
+audit() { logger -t omarchy-vpn -p "auth.$1" -- "user=${SUDO_USER:-?} $2" || true; }
+refuse() { audit warning "refused $cmd: $1"; die "$2"; }
+sha() { sha256sum < "$1" | cut -c1-64; }
+
 # Names are [A-Za-z0-9_-], starting with a letter, digit or underscore
 # (a leading "-" would be read as an option by wg-quick, mv and rm).
 check() {
-    [[ $1 =~ ^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$ ]] || die "invalid config name"
+    [[ $1 =~ ^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$ ]] || refuse "invalid name ${1@Q}" "invalid config name"
 }
 
 # wg-quick runs PreUp/PostUp/PreDown/PostDown as root via bash. An imported
@@ -47,29 +54,34 @@ case $cmd in
             down) exec wg-quick down "$1" ;;
             # Private keys stay root-only; the TUI never displays them.
             cat)  exec grep -Eiv '^[[:space:]]*(PrivateKey|PresharedKey)[[:space:]]*=' "$conf" ;;
-            rm)   exec rm -- "$conf" ;;
+            rm)
+                [[ -f $conf ]] || die "no config named $1"
+                audit notice "delete name=$1 sha256=$(sha "$conf")"
+                exec rm -- "$conf" ;;
         esac
         ;;
     import)
         [[ $# -eq 1 ]] || die "usage: import NAME < file.conf"
         check "$1"
         conf="$dir/$1.conf"
-        [[ -e $conf ]] && die "a config named $1 already exists"
+        [[ -e $conf ]] && refuse "name=$1 exists" "a config named $1 already exists"
         mkdir -p "$dir"
         tmp=$(mktemp "$dir/.import.XXXXXX")
         trap 'rm -f "$tmp"' EXIT
         head -c 1048576 > "$tmp"
-        grep -q '^[[:space:]]*\[Interface\]' "$tmp" || die "not a WireGuard config (no [Interface] section)"
-        has_hooks "$tmp" && die "config has PreUp/PostUp/PreDown/PostDown commands, which would run as root; refusing to import. If you trust it, copy it into $dir yourself with sudo."
+        grep -q '^[[:space:]]*\[Interface\]' "$tmp" || refuse "name=$1 not a WireGuard config" "not a WireGuard config (no [Interface] section)"
+        has_hooks "$tmp" && refuse "name=$1 has PreUp/PostUp/PreDown/PostDown sha256=$(sha "$tmp")" "config has PreUp/PostUp/PreDown/PostDown commands, which would run as root; refusing to import. If you trust it, copy it into $dir yourself with sudo."
         mv -n -- "$tmp" "$conf"
         [[ -e $tmp ]] && die "a config named $1 already exists"
         trap - EXIT
+        audit notice "import name=$1 sha256=$(sha "$conf")"
         ;;
     rename)
         [[ $# -eq 2 ]] || die "usage: rename OLD NEW"
         check "$1"; check "$2"
         [[ -e $dir/$2.conf ]] && die "a config named $2 already exists"
         mv -n -- "$dir/$1.conf" "$dir/$2.conf"
+        audit notice "rename $1 -> $2 sha256=$(sha "$dir/$2.conf")"
         ;;
     *)
         die "usage: omarchy-vpn-helper list|interfaces|show|up|down|cat|import|rename|rm"

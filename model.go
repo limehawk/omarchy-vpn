@@ -184,6 +184,13 @@ type connectDoneMsg struct {
 	warpConflict bool // WARP was up when this WG tunnel connected
 }
 
+// handshakeCheckMsg fires handshakeWait after a successful connect to
+// check that the server actually answered.
+type handshakeCheckMsg struct{ name string }
+
+// handshakeWait covers WireGuard's 5-second handshake retry twice over.
+const handshakeWait = 12 * time.Second
+
 type disconnectDoneMsg struct {
 	name string
 	err  error
@@ -299,8 +306,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				text += warnStyle.Render("  ⚠ Cloudflare WARP is up; may conflict")
 			}
 			m.setMessage(text)
+			m.configs = ListConfigs()
+			name := msg.name
+			return m, tea.Tick(handshakeWait, func(time.Time) tea.Msg { return handshakeCheckMsg{name} })
 		}
 		m.configs = ListConfigs()
+		return m, nil
+
+	case handshakeCheckMsg:
+		if !m.isActive(msg.name) {
+			return m, nil
+		}
+		if s, err := GetVPNStatus(msg.name); err == nil && s.Handshake == "" {
+			logger.Warn("handshake", "name", msg.name, "result", "none after "+handshakeWait.String())
+			m.setMessage(warnStyle.Render("  ⚠ " + msg.name + ": no reply from the server (check its endpoint and that it has this device's key)"))
+		} else if err == nil {
+			logger.Info("handshake", "name", msg.name, "latest", s.Handshake)
+		}
 		return m, nil
 
 	case disconnectDoneMsg:

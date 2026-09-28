@@ -108,7 +108,8 @@ func GetNetBirdStatus() (NetBirdStatus, error) {
 	return parseNetBirdStatus(out)
 }
 
-func NetBirdUp() error {
+func NetBirdUp() (err error) {
+	defer func() { logAction("connect", "netbird", err) }()
 	out, err := exec.Command("netbird", "up").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s", extractError(string(out), err))
@@ -116,7 +117,8 @@ func NetBirdUp() error {
 	return nil
 }
 
-func NetBirdDown() error {
+func NetBirdDown() (err error) {
+	defer func() { logAction("disconnect", "netbird", err) }()
 	out, err := exec.Command("netbird", "down").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s", extractError(string(out), err))

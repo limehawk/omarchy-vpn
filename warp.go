@@ -108,7 +108,8 @@ func warpRegistered() bool {
 	return exec.Command("warp-cli", "registration", "show").Run() == nil
 }
 
-func WarpUp() error {
+func WarpUp() (err error) {
+	defer func() { logAction("connect", "warp", err) }()
 	out, err := exec.Command("warp-cli", "connect").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s", extractError(string(out), err))
@@ -116,7 +117,8 @@ func WarpUp() error {
 	return nil
 }
 
-func WarpDown() error {
+func WarpDown() (err error) {
+	defer func() { logAction("disconnect", "warp", err) }()
 	out, err := exec.Command("warp-cli", "disconnect").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s", extractError(string(out), err))

@@ -46,6 +46,7 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 | `waybar.go` | Waybar module — `--waybar` JSON output + Omarchy 3 `--setup-waybar` / `--remove-waybar` |
 | `styles.go` | Semantic color variables + all lipgloss styles (initialized by `initStyles()`) |
 | `theme.go` | ANSI terminal color assignments → `initColors()` → `initStyles()` |
+| `logging.go` | `charm.land/log/v2` action log at `$XDG_STATE_HOME/omarchy-vpn/omarchy-vpn.log` — TUI only, names + errors, never config contents; rotates at 1 MB |
 | `help.go` | `keyMap` with `key.Binding` definitions, `help.Model` with custom styles |
 
 ## Key Patterns
@@ -62,7 +63,7 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 
 ## Gotchas
 
-- All WireGuard operations need passwordless sudo — PKGBUILD installs one sudoers rule for `%wheel`: `/usr/lib/omarchy-vpn/helper`. **Never grant raw `wg-quick`/`cp`/`cat`/`mv`/`rm` with `*`** — sudoers `*` matches spaces, paths and flags, and `wg-quick up /path` runs `PostUp` as root. New privileged operations go in the helper, which takes names (never paths) and refuses imports with PreUp/PostUp/PreDown/PostDown
+- All WireGuard operations need passwordless sudo — PKGBUILD installs one sudoers rule for `%wheel`: `/usr/lib/omarchy-vpn/helper`. **Never grant raw `wg-quick`/`cp`/`cat`/`mv`/`rm` with `*`** — sudoers `*` matches spaces, paths and flags, and `wg-quick up /path` runs `PostUp` as root. New privileged operations go in the helper, which takes names (never paths) and refuses imports with PreUp/PostUp/PreDown/PostDown. The helper audits changes and refusals to the journal via `logger -t omarchy-vpn` (read with `_UID=0`; the user-owned app log is for troubleshooting, not audit)
 - `systemd-resolvconf` is required (provides `resolvconf` shim for wg-quick DNS)
 - Config names are sanitized to `[a-zA-Z0-9_-]` only
 - Cannot rename or delete an active tunnel — must disconnect first

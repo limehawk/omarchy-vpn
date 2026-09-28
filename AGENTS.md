@@ -110,6 +110,8 @@ git clone ssh://aur@aur.archlinux.org/omarchy-vpn.git /tmp/omarchy-vpn-aur
 # 4. Update PKGBUILD: bump pkgver, reset pkgrel=1
 #    NOTE: the AUR PKGBUILD's build() must also pass
 #    -ldflags "-X main.version=$pkgver" or the AUR package shows version "dev".
+#    It must also keep options=('!debug') (the binary is stripped, so the
+#    debug package would be empty clutter).
 # 5. Regenerate .SRCINFO
 cd /tmp/omarchy-vpn-aur
 makepkg --printsrcinfo > .SRCINFO

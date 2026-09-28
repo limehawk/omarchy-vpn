@@ -1,0 +1,77 @@
+#!/bin/bash
+# Root helper for omarchy-vpn. The only command the sudoers file allows.
+# Everything here runs as root, so it takes config names, never paths,
+# and builds every /etc/wireguard path itself.
+set -euo pipefail
+export PATH=/usr/bin
+umask 077
+
+dir=/etc/wireguard
+
+die() { echo "$*" >&2; exit 1; }
+
+# Names are [A-Za-z0-9_-], starting with a letter, digit or underscore
+# (a leading "-" would be read as an option by wg-quick, mv and rm).
+check() {
+    [[ $1 =~ ^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$ ]] || die "invalid config name"
+}
+
+# wg-quick runs PreUp/PostUp/PreDown/PostDown as root via bash. An imported
+# file must not bring its own root commands.
+has_hooks() {
+    grep -Eiq '^[[:space:]]*(PreUp|PostUp|PreDown|PostDown)[[:space:]]*=' "$1"
+}
+
+cmd=${1:-}
+shift || true
+
+case $cmd in
+    list)
+        [[ $# -eq 0 ]] || die "usage: list"
+        shopt -s nullglob
+        for f in "$dir"/*.conf; do
+            basename "$f" .conf
+        done
+        ;;
+    interfaces)
+        [[ $# -eq 0 ]] || die "usage: interfaces"
+        exec wg show interfaces
+        ;;
+    show|up|down|cat|rm)
+        [[ $# -eq 1 ]] || die "usage: $cmd NAME"
+        check "$1"
+        conf="$dir/$1.conf"
+        case $cmd in
+            show) exec wg show "$1" ;;
+            up)   [[ -f $conf ]] || die "no config named $1"; exec wg-quick up "$1" ;;
+            down) exec wg-quick down "$1" ;;
+            # Private keys stay root-only; the TUI never displays them.
+            cat)  exec grep -Eiv '^[[:space:]]*(PrivateKey|PresharedKey)[[:space:]]*=' "$conf" ;;
+            rm)   exec rm -- "$conf" ;;
+        esac
+        ;;
+    import)
+        [[ $# -eq 1 ]] || die "usage: import NAME < file.conf"
+        check "$1"
+        conf="$dir/$1.conf"
+        [[ -e $conf ]] && die "a config named $1 already exists"
+        mkdir -p "$dir"
+        tmp=$(mktemp "$dir/.import.XXXXXX")
+        trap 'rm -f "$tmp"' EXIT
+        head -c 1048576 > "$tmp"
+        grep -q '^[[:space:]]*\[Interface\]' "$tmp" || die "not a WireGuard config (no [Interface] section)"
+        has_hooks "$tmp" && die "config has PreUp/PostUp/PreDown/PostDown commands, which would run as root; refusing to import. If you trust it, copy it into $dir yourself with sudo."
+        mv -n -- "$tmp" "$conf"
+        [[ -e $tmp ]] && die "a config named $1 already exists"
+        trap - EXIT
+        ;;
+    rename)
+        [[ $# -eq 2 ]] || die "usage: rename OLD NEW"
+        check "$1"; check "$2"
+        [[ -e $dir/$2.conf ]] && die "a config named $2 already exists"
+        mv -n -- "$dir/$1.conf" "$dir/$2.conf"
+        ;;
+    *)
+        die "usage: omarchy-vpn-helper list|interfaces|show|up|down|cat|import|rename|rm"
+        ;;
+esac

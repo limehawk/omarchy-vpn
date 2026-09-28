@@ -42,9 +42,12 @@ func (m model) View() tea.View {
 	titleBar := m.renderTitleBar()
 
 	var bottom string
-	if m.message != "" && time.Now().Before(m.messageExp) {
+	switch {
+	case m.importRename():
+		bottom = warnStyle.Render("  Enter a name (max 15, must include a letter)")
+	case m.message != "" && time.Now().Before(m.messageExp):
 		bottom = m.message
-	} else {
+	default:
 		m.message = ""
 		bottom = renderKeyFooter(m.help, m.keys.ShortHelp(), innerW)
 	}

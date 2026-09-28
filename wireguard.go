@@ -9,9 +9,35 @@ import (
 	"strings"
 )
 
-// isValidConfigName returns true if name contains only [a-zA-Z0-9_-].
+// helperPath is the root helper installed by the package. The sudoers file
+// allows only this command; it takes config names, never paths, and refuses
+// imports that carry PreUp/PostUp/PreDown/PostDown commands.
+const helperPath = "/usr/lib/omarchy-vpn/helper"
+
+func helper(args ...string) *exec.Cmd {
+	return exec.Command("sudo", append([]string{helperPath}, args...)...)
+}
+
+// helperError prefers the helper's own message over "exit status 1".
+func helperError(out []byte, err error) error {
+	if msg := strings.TrimSpace(string(out)); msg != "" {
+		return fmt.Errorf("%s", msg)
+	}
+	return err
+}
+
+// maxInterfaceName is wg-quick's interface-name limit (Linux IFNAMSIZ-1).
+// Names longer than this are treated as a filesystem path, which produces
+// the misleading "`name' does not exist" instead of looking up
+// /etc/wireguard/<name>.conf.
+const maxInterfaceName = 15
+
+// isValidConfigName returns true if name contains only [a-zA-Z0-9_-] and
+// does not start with "-" (it would be read as an option).
+// Length and "all digits" are not checked here so already-imported
+// invalid names still appear in the list and can be renamed.
 func isValidConfigName(name string) bool {
-	if name == "" {
+	if name == "" || name[0] == '-' {
 		return false
 	}
 	for _, r := range name {
@@ -20,6 +46,58 @@ func isValidConfigName(name string) bool {
 		}
 	}
 	return true
+}
+
+func isDigitsOnly(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// interfaceNameError is nil when name is safe to pass to wg-quick as an
+// interface (charset, max 15 characters, not all digits).
+func interfaceNameError(name string) error {
+	if !isValidConfigName(name) {
+		return fmt.Errorf("invalid config name")
+	}
+	if len(name) > maxInterfaceName {
+		return fmt.Errorf("name %q is too long for WireGuard (max %d characters); rename it first", name, maxInterfaceName)
+	}
+	if isDigitsOnly(name) {
+		return fmt.Errorf("name %q is only numbers; systemd treats that as an interface index", name)
+	}
+	return nil
+}
+
+// suggestInterfaceName turns a raw config name into something wg-quick and
+// systemd-resolved will accept: charset-safe, ≤15 characters, not all digits.
+func suggestInterfaceName(name string) string {
+	name = strings.TrimLeft(sanitizeName(name), "-")
+	if interfaceNameError(name) == nil {
+		return name
+	}
+	if isDigitsOnly(name) {
+		name = "wg" + name
+	}
+	if len(name) > maxInterfaceName {
+		name = strings.TrimRight(name[:maxInterfaceName], "-_")
+	}
+	if interfaceNameError(name) != nil && isDigitsOnly(name) {
+		name = "wg" + name
+		if len(name) > maxInterfaceName {
+			name = strings.TrimRight(name[:maxInterfaceName], "-_")
+		}
+	}
+	if interfaceNameError(name) != nil {
+		return "imported"
+	}
+	return name
 }
 
 type VPNStatus struct {
@@ -37,7 +115,7 @@ func GetActiveVPNs() []string {
 	if demoMode {
 		return demoActiveVPNs()
 	}
-	out, err := exec.Command("sudo", "wg", "show", "interfaces").Output()
+	out, err := helper("interfaces").Output()
 	if err != nil {
 		return nil
 	}
@@ -55,28 +133,28 @@ func ListConfigs() []string {
 	if demoMode {
 		return demoListConfigs()
 	}
-	out, err := exec.Command("sudo", "ls", "/etc/wireguard").Output()
+	out, err := helper("list").Output()
 	if err != nil {
 		return nil
 	}
 	var configs []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if strings.HasSuffix(line, ".conf") {
-			name := strings.TrimSuffix(line, ".conf")
-			if isValidConfigName(name) {
-				configs = append(configs, name)
-			}
+	for _, name := range strings.Fields(string(out)) {
+		if isValidConfigName(name) {
+			configs = append(configs, name)
 		}
 	}
 	return configs
 }
 
 func ConnectVPN(name string) error {
+	if err := interfaceNameError(name); err != nil {
+		return err
+	}
 	if demoMode {
 		demoConnect(name)
 		return nil
 	}
-	out, err := exec.Command("sudo", "wg-quick", "up", name).CombinedOutput()
+	out, err := helper("up", name).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s", extractError(string(out), err))
 	}
@@ -88,7 +166,7 @@ func DisconnectVPN(name string) error {
 		demoDisconnect(name)
 		return nil
 	}
-	out, err := exec.Command("sudo", "wg-quick", "down", name).CombinedOutput()
+	out, err := helper("down", name).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s", extractError(string(out), err))
 	}
@@ -112,7 +190,7 @@ func GetVPNStatus(name string) (VPNStatus, error) {
 	if demoMode {
 		return demoVPNStatus(name), nil
 	}
-	out, err := exec.Command("sudo", "wg", "show", name).Output()
+	out, err := helper("show", name).Output()
 	if err != nil {
 		return VPNStatus{}, err
 	}
@@ -139,35 +217,49 @@ func GetVPNStatus(name string) (VPNStatus, error) {
 }
 
 func ImportConfig(src, name string) error {
+	if err := interfaceNameError(name); err != nil {
+		return err
+	}
 	if demoMode {
 		return nil
 	}
-	if err := exec.Command("sudo", "cp", src, fmt.Sprintf("/etc/wireguard/%s.conf", name)).Run(); err != nil {
+	// The file is opened as the user and streamed in, so the helper never
+	// touches a path the user chose.
+	f, err := os.Open(src)
+	if err != nil {
 		return err
 	}
-	return exec.Command("sudo", "chmod", "600", fmt.Sprintf("/etc/wireguard/%s.conf", name)).Run()
+	defer f.Close()
+	cmd := helper("import", name)
+	cmd.Stdin = f
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return helperError(out, err)
+	}
+	return nil
 }
 
 func RemoveConfig(name string) error {
 	if demoMode {
 		return nil
 	}
-	return exec.Command("sudo", "rm", fmt.Sprintf("/etc/wireguard/%s.conf", name)).Run()
+	out, err := helper("rm", name).CombinedOutput()
+	if err != nil {
+		return helperError(out, err)
+	}
+	return nil
 }
 
 func RenameConfig(oldName, newName string) error {
+	if err := interfaceNameError(newName); err != nil {
+		return err
+	}
 	if demoMode {
 		return nil
 	}
-	oldPath := fmt.Sprintf("/etc/wireguard/%s.conf", oldName)
-	newPath := fmt.Sprintf("/etc/wireguard/%s.conf", newName)
-	out, err := exec.Command("sudo", "mv", oldPath, newPath).CombinedOutput()
+	out, err := helper("rename", oldName, newName).CombinedOutput()
 	if err != nil {
-		msg := strings.TrimSpace(string(out))
-		if msg != "" {
-			return fmt.Errorf("%s", msg)
-		}
-		return err
+		return helperError(out, err)
 	}
 	return nil
 }

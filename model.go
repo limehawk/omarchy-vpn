@@ -51,6 +51,7 @@ type model struct {
 	modal       modalState
 	renameInput textinput.Model
 	renameOrig  string
+	importPath  string // pending source file when renaming as part of import
 	connectName string
 	spinner     spinner.Model
 	filePicker  filepicker.Model
@@ -341,11 +342,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case importDoneMsg:
+		m.importPath = ""
 		if msg.err != nil {
 			m.setMessage(errorStyle.Render("  Import failed: " + msg.err.Error()))
 		} else {
 			m.setMessage(connectedStyle.Render("  Imported " + msg.name))
 			m.configs = ListConfigs()
+			m.restoreSelection(msg.name)
 		}
 		return m, nil
 
@@ -467,12 +470,8 @@ func (m *model) updateNormal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.setMessage(warnStyle.Render("  Disconnect before renaming"))
 			break
 		}
-		m.modal = modalRenaming
-		m.renameOrig = selected
-		m.renameInput.SetValue(selected)
-		m.renameInput.Focus()
-		m.renameInput.CursorEnd()
-		return m, textinput.Blink
+		m.importPath = ""
+		return m, m.beginRename(selected)
 
 	case key.Matches(msg, m.keys.Delete):
 		if m.netbirdSelected() {
@@ -527,6 +526,11 @@ func (m *model) toggleSelected() (tea.Model, tea.Cmd) {
 			err := DisconnectVPN(selected)
 			return disconnectDoneMsg{name: selected, err: err}
 		}
+	}
+	if err := interfaceNameError(selected); err != nil {
+		m.setMessage(warnStyle.Render("  " + err.Error() + " — rename before connecting"))
+		m.importPath = ""
+		return m, m.beginRename(selected)
 	}
 	m.modal = modalConnecting
 	m.connectName = selected
@@ -624,6 +628,11 @@ func (m *model) handleFileSelected(path string) tea.Cmd {
 	name := strings.TrimSuffix(base, ext)
 	name = strings.ReplaceAll(name, " ", "-")
 	name = sanitizeName(name)
+	if err := interfaceNameError(name); err != nil {
+		m.importPath = path
+		m.setMessage(warnStyle.Render("  " + err.Error() + " — enter a new name"))
+		return m.beginRename(name)
+	}
 
 	return func() tea.Msg {
 		err := ImportConfig(path, name)
@@ -631,11 +640,21 @@ func (m *model) handleFileSelected(path string) tea.Cmd {
 	}
 }
 
+func (m *model) beginRename(orig string) tea.Cmd {
+	m.modal = modalRenaming
+	m.renameOrig = orig
+	m.renameInput.SetValue(suggestInterfaceName(orig))
+	m.renameInput.Focus()
+	m.renameInput.CursorEnd()
+	return textinput.Blink
+}
+
 func (m *model) updateRename(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.modal = modalNone
 		m.renameInput.Blur()
+		m.importPath = ""
 		return m, nil
 
 	case "enter":
@@ -644,7 +663,11 @@ func (m *model) updateRename(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.setMessage(errorStyle.Render("  Name cannot be empty"))
 			return m, nil
 		}
-		if newName == m.renameOrig {
+		if err := interfaceNameError(newName); err != nil {
+			m.setMessage(errorStyle.Render("  " + err.Error()))
+			return m, nil
+		}
+		if m.importPath == "" && newName == m.renameOrig {
 			m.modal = modalNone
 			m.renameInput.Blur()
 			return m, nil
@@ -655,8 +678,16 @@ func (m *model) updateRename(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-		oldName := m.renameOrig
 		m.renameInput.Blur()
+		if path := m.importPath; path != "" {
+			m.modal = modalNone
+			m.importPath = ""
+			return m, func() tea.Msg {
+				err := ImportConfig(path, newName)
+				return importDoneMsg{name: newName, err: err}
+			}
+		}
+		oldName := m.renameOrig
 		return m, func() tea.Msg {
 			err := RenameConfig(oldName, newName)
 			return renameDoneMsg{oldName: oldName, newName: newName, err: err}

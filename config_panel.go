@@ -1,9 +1,13 @@
 package main
 
+func (m model) importRename() bool {
+	return m.modal == modalRenaming && m.importPath != ""
+}
+
 func (m model) renderConfigPanel(width, height int) string {
 	inW := boxInnerWidth(width)
 	var lines []string
-	if m.listLen() == 0 {
+	if m.listLen() == 0 && !m.importRename() {
 		lines = append(lines, dimStyle.Render("No configs."))
 	} else {
 		for _, r := range m.indexRows() {
@@ -12,6 +16,12 @@ func (m model) renderConfigPanel(width, height int) string {
 		if n := len(lines); n > 0 && lines[n-1] == "" {
 			lines = lines[:n-1]
 		}
+	}
+	if m.importRename() {
+		if len(lines) > 0 {
+			lines = append(lines, "")
+		}
+		lines = append(lines, m.renameInput.View(), dimStyle.Render("max 15 characters, include a letter"))
 	}
 	return titledBox("Tunnels", lines, width, height)
 }
@@ -50,7 +60,7 @@ func (m model) indexRows() []indexRow {
 
 func (m model) renderIndexItem(row indexRow, width int) []string {
 	selected := row.index == m.cursor
-	if selected && m.modal == modalRenaming {
+	if selected && m.modal == modalRenaming && m.importPath == "" {
 		return []string{m.renameInput.View(), ""}
 	}
 	if selected && m.modal == modalDeleting {

@@ -55,7 +55,7 @@ go build -o omarchy-vpn .
 sudo install -Dm755 omarchy-vpn /usr/bin/omarchy-vpn
 ```
 
-You'll need to manually create `/etc/sudoers.d/omarchy-vpn` — see the [PKGBUILD](PKGBUILD) for the required rules.
+You'll also need to install `omarchy-vpn-helper` to `/usr/lib/omarchy-vpn/helper` and create `/etc/sudoers.d/omarchy-vpn` — see the [PKGBUILD](PKGBUILD).
 
 ## Usage
 

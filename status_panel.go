@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 )
 
@@ -27,7 +26,7 @@ func ParseConfigFile(name string) ConfigInfo {
 		return demoConfigInfo(name)
 	}
 	path := fmt.Sprintf("/etc/wireguard/%s.conf", name)
-	out, err := exec.Command("sudo", "cat", path).Output()
+	out, err := helper("cat", name).Output()
 	if err != nil {
 		data, err2 := os.ReadFile(path)
 		if err2 != nil {

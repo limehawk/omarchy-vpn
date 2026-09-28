@@ -1,6 +1,14 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+)
 
 func TestCursorHelpersWithNetbird(t *testing.T) {
 	m := model{netbirdAvail: true, configs: []string{"alpha", "beta"}}
@@ -131,4 +139,204 @@ func TestRestoreSelectionKeepsConfigWhenWarpDisappears(t *testing.T) {
 	if got := m.selectedConfig(); got != "alpha" {
 		t.Errorf("after WARP hid: selectedConfig() = %q, want alpha", got)
 	}
+}
+
+func TestImportTooLongPromptsRename(t *testing.T) {
+	initColors()
+	path := writeTempConf(t, "108-One-Click-VPN-omarchy.conf")
+	m := testModel()
+	m.configs = []string{"derby-maryville"}
+
+	cmd := m.handleFileSelected(path)
+	if m.modal != modalRenaming {
+		t.Fatalf("modal = %v, want renaming", m.modal)
+	}
+	if m.importPath != path {
+		t.Fatalf("importPath = %q, want %q", m.importPath, path)
+	}
+	if got := m.renameInput.Value(); got != "108-One-Click-V" {
+		t.Errorf("rename input = %q, want suggested valid name", got)
+	}
+	if cmd == nil {
+		t.Error("expected blink cmd so the input is focused")
+	}
+}
+
+func TestImportShortNameDoesNotPromptRename(t *testing.T) {
+	initColors()
+	path := writeTempConf(t, "office.conf")
+	m := testModel()
+
+	_ = m.handleFileSelected(path)
+	if m.modal == modalRenaming {
+		t.Fatal("short name should import, not prompt rename")
+	}
+	if m.importPath != "" {
+		t.Fatalf("importPath = %q, want empty", m.importPath)
+	}
+}
+
+func TestImportRenameEscCancels(t *testing.T) {
+	initColors()
+	m := testModel()
+	m.modal = modalRenaming
+	m.importPath = "/tmp/foo.conf"
+	m.renameInput.SetValue("108-One-Click-VPN-omarchy")
+
+	_, cmd := m.updateRename(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if m.modal != modalNone {
+		t.Errorf("modal = %v, want none", m.modal)
+	}
+	if m.importPath != "" {
+		t.Errorf("importPath = %q, want empty", m.importPath)
+	}
+	if cmd != nil {
+		t.Error("esc must not import")
+	}
+}
+
+func TestImportNumericNamePromptsRename(t *testing.T) {
+	initColors()
+	path := writeTempConf(t, "108.conf")
+	m := testModel()
+
+	_ = m.handleFileSelected(path)
+	if m.modal != modalRenaming {
+		t.Fatalf("modal = %v, want renaming", m.modal)
+	}
+	if m.importPath != path {
+		t.Fatalf("importPath = %q, want %q", m.importPath, path)
+	}
+	if got := m.renameInput.Value(); got != "wg108" {
+		t.Errorf("rename input = %q, want wg108", got)
+	}
+}
+
+func TestImportRenameRejectsNumeric(t *testing.T) {
+	initColors()
+	m := testModel()
+	m.modal = modalRenaming
+	m.importPath = "/tmp/foo.conf"
+	m.renameInput.SetValue("108")
+
+	_, cmd := m.updateRename(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.modal != modalRenaming {
+		t.Errorf("modal = %v, want renaming", m.modal)
+	}
+	if cmd != nil {
+		t.Error("must not import a numeric name")
+	}
+	if !strings.Contains(m.message, "number") {
+		t.Errorf("message = %q, want numbers hint", m.message)
+	}
+}
+
+func TestImportRenameRejectsStillTooLong(t *testing.T) {
+	initColors()
+	m := testModel()
+	m.modal = modalRenaming
+	m.importPath = "/tmp/foo.conf"
+	m.renameInput.SetValue("still-way-too-long")
+
+	_, cmd := m.updateRename(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.modal != modalRenaming {
+		t.Errorf("modal = %v, want renaming", m.modal)
+	}
+	if m.importPath == "" {
+		t.Error("importPath cleared; should keep pending import")
+	}
+	if cmd != nil {
+		t.Error("must not import a too-long name")
+	}
+}
+
+func TestImportRenameAcceptsShortName(t *testing.T) {
+	initColors()
+	m := testModel()
+	m.modal = modalRenaming
+	m.importPath = "/tmp/foo.conf"
+	m.renameInput.SetValue("one-click")
+
+	_, cmd := m.updateRename(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.modal != modalNone {
+		t.Errorf("modal = %v, want none", m.modal)
+	}
+	if m.importPath != "" {
+		t.Errorf("importPath = %q, want empty", m.importPath)
+	}
+	if cmd == nil {
+		t.Fatal("expected ImportConfig cmd")
+	}
+}
+
+func TestConnectNumericNamePromptsRename(t *testing.T) {
+	initColors()
+	m := testModel()
+	m.configs = []string{"108"}
+	m.cursor = 0
+
+	_, cmd := m.toggleSelected()
+	if m.modal != modalRenaming {
+		t.Fatalf("modal = %v, want renaming", m.modal)
+	}
+	if got := m.renameOrig; got != "108" {
+		t.Errorf("renameOrig = %q", got)
+	}
+	if got := m.renameInput.Value(); got != "wg108" {
+		t.Errorf("rename input = %q, want wg108", got)
+	}
+	if cmd == nil {
+		t.Error("expected blink cmd")
+	}
+}
+
+func TestConnectLongNamePromptsRename(t *testing.T) {
+	initColors()
+	m := testModel()
+	m.configs = []string{"108-One-Click-VPN-omarchy"}
+	m.cursor = 0
+
+	_, cmd := m.toggleSelected()
+	if m.modal != modalRenaming {
+		t.Fatalf("modal = %v, want renaming", m.modal)
+	}
+	if m.importPath != "" {
+		t.Error("existing config rename must not set importPath")
+	}
+	if got := m.renameOrig; got != "108-One-Click-VPN-omarchy" {
+		t.Errorf("renameOrig = %q", got)
+	}
+	if cmd == nil {
+		t.Error("expected blink cmd")
+	}
+}
+
+func TestConfigPanelShowsImportRenamePrompt(t *testing.T) {
+	initColors()
+	m := testModel()
+	m.modal = modalRenaming
+	m.importPath = "/tmp/foo.conf"
+	m.renameInput.SetValue("108-One-Click-V")
+	m.renameInput.Focus()
+
+	got := m.renderConfigPanel(36, 16)
+	if !strings.Contains(got, "108-One-Click-V") {
+		t.Fatalf("missing rename input:\n%s", got)
+	}
+	if !strings.Contains(got, "max 15") {
+		t.Fatalf("missing length hint:\n%s", got)
+	}
+}
+
+func testModel() model {
+	return model{renameInput: textinput.New()}
+}
+
+func writeTempConf(t *testing.T, name string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, []byte("[Interface]\nPrivateKey = dGVzdA==\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

@@ -37,7 +37,8 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 | `dashboard.go` | `View()` — title bar + panels + help bar, returns `tea.View` |
 | `config_panel.go` | Left panel — config list with inline rename/delete/connecting states |
 | `status_panel.go` | Right panel — live stats (connected) or config preview (disconnected) |
-| `wireguard.go` | Backend — config name validation + all `sudo` exec calls to wg-quick/wg |
+| `wireguard.go` | Backend — config name validation + all `sudo` calls, which go through `helper()` |
+| `omarchy-vpn-helper` | Root helper installed to `/usr/lib/omarchy-vpn/helper` — the only command sudoers allows |
 | `netbird.go` | NetBird backend — `netbird status --json` parsing + up/down (no sudo, talks to daemon) |
 | `warp.go` | Cloudflare WARP backend — `warp-cli status` **text** parsing + connect/disconnect (no sudo, talks to daemon) |
 | `desktop.go` | Detect Omarchy 3 vs 4 and dispatch `--setup` / `--remove` |
@@ -57,11 +58,11 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 - **Flash messages** — `setMessage()` sets 3-second expiry, replaces help bar
 - **Bubbles help component** — `help.Model` generates both the bottom bar (`ShortHelp`) and the help overlay (`FullHelp`) from `keyMap`
 - **`extractError()`** strips `[#]` trace lines from wg-quick output, returns only the meaningful error
-- **`ParseConfigFile()`** uses `sudo cat` to read root-owned configs, falls back to `os.ReadFile()`
+- **`ParseConfigFile()`** uses `helper cat` (private keys stripped) to read root-owned configs, falls back to `os.ReadFile()`
 
 ## Gotchas
 
-- All WireGuard operations need passwordless sudo — PKGBUILD installs sudoers rules for `%wheel`
+- All WireGuard operations need passwordless sudo — PKGBUILD installs one sudoers rule for `%wheel`: `/usr/lib/omarchy-vpn/helper`. **Never grant raw `wg-quick`/`cp`/`cat`/`mv`/`rm` with `*`** — sudoers `*` matches spaces, paths and flags, and `wg-quick up /path` runs `PostUp` as root. New privileged operations go in the helper, which takes names (never paths) and refuses imports with PreUp/PostUp/PreDown/PostDown
 - `systemd-resolvconf` is required (provides `resolvconf` shim for wg-quick DNS)
 - Config names are sanitized to `[a-zA-Z0-9_-]` only
 - Cannot rename or delete an active tunnel — must disconnect first
@@ -91,6 +92,7 @@ Origin is private. GitHub is a push mirror. AUR is a **separate git server** —
 **Release process:**
 
 ```bash
+# 0. Bump PKGBUILD pkgver AND plugin/manifest.json "version" (TestShippedVersionSourcesMatch fails otherwise)
 # 1. Tag + push (origin mirrors to GitHub)
 git tag -a v0.X.X -m "omarchy-vpn 0.X.X"
 git push && git push --tags

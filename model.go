@@ -24,6 +24,7 @@ const (
 	modalRenaming
 	modalDeleting
 	modalHelp
+	modalHookConfirm
 	modalImporting
 )
 
@@ -52,6 +53,8 @@ type model struct {
 	renameInput textinput.Model
 	renameOrig  string
 	importPath  string // pending source file when renaming as part of import
+	importName  string   // target name while confirming a config with hooks
+	importHooks []string // hook lines shown in the confirm overlay
 	connectName string
 	spinner     spinner.Model
 	filePicker  filepicker.Model
@@ -427,6 +430,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateRename(msg)
 		case modalDeleting:
 			return m.updateDelete(msg)
+		case modalHookConfirm:
+			return m.updateHookConfirm(msg)
 		case modalConnecting:
 			return m, nil // block input while connecting
 		case modalImporting:
@@ -656,10 +661,43 @@ func (m *model) handleFileSelected(path string) tea.Cmd {
 		return m.beginRename(name)
 	}
 
+	return m.startImport(path, name)
+}
+
+// startImport imports a config under a validated name. Configs with root
+// hook commands stop at a confirm overlay that lists them; everything else
+// goes straight to the passwordless helper.
+func (m *model) startImport(path, name string) tea.Cmd {
+	if slices.Contains(m.configs, name) {
+		logger.Info("import", "name", name, "result", "refused: name exists")
+		m.setMessage(errorStyle.Render("  '" + name + "' already exists — delete or rename it first"))
+		return nil
+	}
+	if hooks := ConfigHooks(path); len(hooks) > 0 {
+		m.modal = modalHookConfirm
+		m.importPath, m.importName, m.importHooks = path, name, hooks
+		return nil
+	}
 	return func() tea.Msg {
 		err := ImportConfig(path, name)
 		return importDoneMsg{name: name, err: err}
 	}
+}
+
+func (m *model) updateHookConfirm(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	path, name := m.importPath, m.importName
+	m.modal = modalNone
+	m.importPath, m.importName, m.importHooks = "", "", nil
+	if msg.String() != "y" && msg.String() != "Y" {
+		logger.Info("import", "name", name, "result", "declined: has root hooks")
+		m.setMessage(dimStyle.Render("  Import cancelled"))
+		return m, nil
+	}
+	// Suspends the TUI so sudo can ask for the password in the terminal.
+	return m, tea.ExecProcess(installWithHooksCmd(path, name), func(err error) tea.Msg {
+		logAction("import (with hooks, authenticated)", name, err)
+		return importDoneMsg{name: name, err: err}
+	})
 }
 
 func (m *model) beginRename(orig string) tea.Cmd {
@@ -704,10 +742,7 @@ func (m *model) updateRename(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if path := m.importPath; path != "" {
 			m.modal = modalNone
 			m.importPath = ""
-			return m, func() tea.Msg {
-				err := ImportConfig(path, newName)
-				return importDoneMsg{name: newName, err: err}
-			}
+			return m, m.startImport(path, newName)
 		}
 		oldName := m.renameOrig
 		return m, func() tea.Msg {

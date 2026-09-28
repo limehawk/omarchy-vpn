@@ -133,7 +133,9 @@ omarchy-vpn is a TUI wrapper around `wg-quick` and `wg show`. Configs live in `/
 
 Connect runs `wg-quick up <config>`. Disconnect runs `wg-quick down <config>`. The VPN runs in the kernel — closing the TUI doesn't affect your connection.
 
-Multiple tunnels can be active at once. When you connect to a config, only active tunnels whose `AllowedIPs` overlap the new config's routes are brought down first — tunnels routing disjoint subnets stay connected. Two full-tunnel configs (`0.0.0.0/0`) always overlap, so connecting one switches away from the other, same as before.
+Multiple tunnels can be active at once. When you connect to a config, only active tunnels whose `AllowedIPs` overlap the new config's routes are brought down first — tunnels routing disjoint subnets stay connected. Two full-tunnel configs (`0.0.0.0/0`) always overlap, so connecting one switches away from the other. A tunnel whose routes sit entirely inside another's (e.g. a LAN `192.168.1.0/24` tunnel next to a `0.0.0.0/0` VPN) stays connected alongside it: the kernel sends the more specific traffic to the more specific tunnel.
+
+Configs with `PreUp`/`PostUp`/`PreDown`/`PostDown` lines run those commands as root on every connect. When you import one, the app lists the exact commands and asks before installing it, and installing it needs your sudo password.
 
 ## Troubleshooting
 

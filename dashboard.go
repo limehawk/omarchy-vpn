@@ -37,6 +37,23 @@ func (m model) View() tea.View {
 		return v
 	}
 
+	if m.modal == modalHookConfirm {
+		var b strings.Builder
+		for _, h := range m.importHooks {
+			b.WriteString("  " + warnStyle.Render(h) + "\n")
+		}
+		overlay := helpOverlayStyle.Render(
+			helpTitleStyle.Render("Import "+m.importName+"?") + "\n\n" +
+				"This config runs these commands " + errorStyle.Render("as root") + " every time it connects:\n\n" +
+				b.String() + "\n" +
+				"Only continue if you trust whoever gave you this file.\n" +
+				dimStyle.Render("y import (asks for your password) · any other key cancels"),
+		)
+		v := tea.NewView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay))
+		v.AltScreen = true
+		return v
+	}
+
 	// header (2) + blank + panes + blank + footer
 	innerW := pageInnerWidth(m.width)
 	titleBar := m.renderTitleBar()

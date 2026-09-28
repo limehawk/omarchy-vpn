@@ -340,3 +340,48 @@ func writeTempConf(t *testing.T, name string) string {
 	}
 	return path
 }
+
+func TestImportWithHooksAsksFirst(t *testing.T) {
+	initColors()
+	path := filepath.Join(t.TempDir(), "lan.conf")
+	conf := "[Interface]\nPrivateKey = dGVzdA==\nTable = off\n  postup = ip route add 192.168.1.0/24 dev %i\nPreDown = ip route del 192.168.1.0/24 dev %i\n"
+	if err := os.WriteFile(path, []byte(conf), 0600); err != nil {
+		t.Fatal(err)
+	}
+	m := testModel()
+	m.width, m.height = 120, 40
+
+	if cmd := m.handleFileSelected(path); cmd != nil {
+		t.Fatal("hook config must not import before confirmation")
+	}
+	if m.modal != modalHookConfirm || m.importName != "lan" || len(m.importHooks) != 2 {
+		t.Fatalf("modal=%v name=%q hooks=%q, want confirm for lan with 2 hooks", m.modal, m.importName, m.importHooks)
+	}
+	if !strings.Contains(m.View().Content, "ip route add 192.168.1.0/24") {
+		t.Error("overlay must show the exact hook command")
+	}
+
+	_, cmd := m.updateHookConfirm(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	if cmd != nil || m.modal != modalNone || m.importPath != "" {
+		t.Errorf("declining must cancel cleanly: cmd=%v modal=%v path=%q", cmd != nil, m.modal, m.importPath)
+	}
+
+	_ = m.handleFileSelected(path)
+	if _, cmd := m.updateHookConfirm(tea.KeyPressMsg{Code: 'y', Text: "y"}); cmd == nil {
+		t.Error("confirming must return the authenticated install cmd")
+	}
+}
+
+func TestImportRefusesExistingName(t *testing.T) {
+	initColors()
+	path := writeTempConf(t, "office.conf")
+	m := testModel()
+	m.configs = []string{"office"}
+
+	if cmd := m.handleFileSelected(path); cmd != nil {
+		t.Fatal("import over an existing config must not run")
+	}
+	if !strings.Contains(m.message, "already exists") {
+		t.Errorf("message = %q, want already-exists warning", m.message)
+	}
+}

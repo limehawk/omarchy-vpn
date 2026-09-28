@@ -63,11 +63,11 @@ Single Bubble Tea program with modal states instead of view routing. All UI is o
 
 ## Gotchas
 
-- All WireGuard operations need passwordless sudo — PKGBUILD installs one sudoers rule for `%wheel`: `/usr/lib/omarchy-vpn/helper`. **Never grant raw `wg-quick`/`cp`/`cat`/`mv`/`rm` with `*`** — sudoers `*` matches spaces, paths and flags, and `wg-quick up /path` runs `PostUp` as root. New privileged operations go in the helper, which takes names (never paths) and refuses imports with PreUp/PostUp/PreDown/PostDown. The helper audits changes and refusals to the journal via `logger -t omarchy-vpn` (read with `_UID=0`; the user-owned app log is for troubleshooting, not audit)
+- All WireGuard operations need passwordless sudo — PKGBUILD installs one sudoers rule for `%wheel`: `/usr/lib/omarchy-vpn/helper`. **Never grant raw `wg-quick`/`cp`/`cat`/`mv`/`rm` with `*`** — sudoers `*` matches spaces, paths and flags, and `wg-quick up /path` runs `PostUp` as root. New privileged operations go in the helper, which takes names (never paths) and refuses imports with PreUp/PostUp/PreDown/PostDown. The helper audits changes and refusals to the journal via `logger -t omarchy-vpn` (read with `_UID=0`; the user-owned app log is for troubleshooting, not audit) The TUI still imports hook configs, but only after showing the hook lines and running plain `sudo install` via `tea.ExecProcess` (password required). Never add a hooks flag to the helper; that reopens passwordless root.
 - `systemd-resolvconf` is required (provides `resolvconf` shim for wg-quick DNS)
 - Config names are sanitized to `[a-zA-Z0-9_-]` only
 - Cannot rename or delete an active tunnel — must disconnect first
-- Multiple tunnels may be active at once; connecting only tears down active tunnels whose `AllowedIPs` overlap the new config's (unparseable/missing AllowedIPs are treated as overlapping, so full-tunnel switching is preserved)
+- Multiple tunnels may be active at once; connecting only tears down active tunnels whose `AllowedIPs` overlap the new config's (unparseable/missing AllowedIPs are treated as overlapping, so full-tunnel switching is preserved) Nested route sets (every prefix of one strictly inside the other, e.g. LAN /24 inside 0.0.0.0/0) coexist (#40); identical prefixes still conflict.
 - NetBird row appears only when `netbird` is installed, the daemon is up, and a session exists; it coexists with WG tunnels (overlay mesh, not mutually exclusive)
 - `netbird up` is never run when the daemon reports NeedsLogin/SessionExpired — it would block on browser SSO
 - Cloudflare WARP row appears only when `warp-cli` is installed, `warp-svc` is up, and the client is registered. Installed-but-unused is hidden (no sudo for warp-cli itself)

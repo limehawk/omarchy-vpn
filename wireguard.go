@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"os"
 	"os/exec"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -290,14 +291,21 @@ func parseAllowedIPs(vals []string) []netip.Prefix {
 	return prefixes
 }
 
-// allowedIPsOverlap reports whether two AllowedIPs sets route any of the
-// same address space. Configs whose AllowedIPs are missing or entirely
+// allowedIPsOverlap reports whether two AllowedIPs sets conflict: they route
+// some of the same address space and neither set nests strictly inside the
+// other. Nested sets (a LAN /24 next to a 0.0.0.0/0 full tunnel) coexist,
+// because the kernel's longest-prefix match sends the specific traffic to
+// the specific tunnel (#40). Identical prefixes, including two full tunnels,
+// still conflict. Configs whose AllowedIPs are missing or entirely
 // unparseable are treated as overlapping, so the safe switch behavior
 // (disconnect first) applies when routes can't be compared.
 func allowedIPsOverlap(a, b []string) bool {
 	pa, pb := parseAllowedIPs(a), parseAllowedIPs(b)
 	if len(pa) == 0 || len(pb) == 0 {
 		return true
+	}
+	if nestedInside(pa, pb) || nestedInside(pb, pa) {
+		return false
 	}
 	for _, x := range pa {
 		for _, y := range pb {
@@ -307,6 +315,19 @@ func allowedIPsOverlap(a, b []string) bool {
 		}
 	}
 	return false
+}
+
+// nestedInside reports whether every prefix in inner is strictly more
+// specific than some prefix in outer.
+func nestedInside(inner, outer []netip.Prefix) bool {
+	for _, p := range inner {
+		if !slices.ContainsFunc(outer, func(q netip.Prefix) bool {
+			return q.Bits() < p.Bits() && q.Contains(p.Addr())
+		}) {
+			return false
+		}
+	}
+	return true
 }
 
 // conflictingVPNs returns the active tunnels whose AllowedIPs overlap the
@@ -321,6 +342,34 @@ func conflictingVPNs(name string, active []string) []string {
 		}
 	}
 	return conflicts
+}
+
+// hookRe matches wg-quick hook lines, which run as root through bash.
+// Keys are matched case-insensitively, like the helper does.
+var hookRe = regexp.MustCompile(`(?i)^\s*(PreUp|PostUp|PreDown|PostDown)\s*=`)
+
+// ConfigHooks returns the PreUp/PostUp/PreDown/PostDown lines in a config
+// file, trimmed, so the user can see exactly what would run as root.
+func ConfigHooks(path string) []string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var hooks []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if hookRe.MatchString(line) {
+			hooks = append(hooks, strings.TrimSpace(line))
+		}
+	}
+	return hooks
+}
+
+// installWithHooksCmd copies a config that carries root hook commands. The
+// passwordless helper refuses these on purpose, so this runs plain sudo,
+// which is not in our sudoers file and asks for the user's password.
+func installWithHooksCmd(src, name string) *exec.Cmd {
+	return exec.Command("sudo", "install", "-m", "600", "-o", "root", "-g", "root",
+		"-T", "--", src, fmt.Sprintf("/etc/wireguard/%s.conf", name))
 }
 
 func ValidateConfig(path string) bool {

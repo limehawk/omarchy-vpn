@@ -37,8 +37,11 @@ func TestAllowedIPsOverlap(t *testing.T) {
 	}{
 		{"disjoint subnets", []string{"10.1.0.0/24"}, []string{"10.2.0.0/24"}, false},
 		{"identical subnets", []string{"10.1.0.0/24"}, []string{"10.1.0.0/24"}, true},
-		{"nested subnets", []string{"10.0.0.0/8"}, []string{"10.1.0.0/24"}, true},
-		{"full tunnel vs subnet", []string{"0.0.0.0/0"}, []string{"10.1.0.0/24"}, true},
+		{"nested subnets coexist", []string{"10.0.0.0/8"}, []string{"10.1.0.0/24"}, false},
+		{"full tunnel vs LAN subnet coexist (#40)", []string{"0.0.0.0/0"}, []string{"192.168.1.0/24"}, false},
+		{"dual-stack full tunnel vs LAN subnet (#40)", []string{"0.0.0.0/0, ::/0"}, []string{"192.168.1.0/24"}, false},
+		{"partial overlap, neither nested", []string{"10.0.0.0/8, 192.168.1.0/24"}, []string{"10.1.0.0/24, 172.16.0.0/12"}, true},
+		{"shared prefix is not nesting", []string{"0.0.0.0/0"}, []string{"0.0.0.0/0, 10.1.0.0/24"}, true},
 		{"two full tunnels", []string{"0.0.0.0/0, ::/0"}, []string{"0.0.0.0/0"}, true},
 		{"disjoint v4 vs v6", []string{"10.1.0.0/24"}, []string{"fd00::/64"}, false},
 		{"comma-separated disjoint", []string{"10.1.0.0/24, 10.2.0.0/24"}, []string{"10.3.0.0/24"}, false},

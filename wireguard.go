@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -116,6 +117,9 @@ func GetActiveVPNs() []string {
 	if demoMode {
 		return demoActiveVPNs()
 	}
+	if !anyWireGuardLink() {
+		return nil // nothing to ask root about; keeps the bar widget's poll sudo-free
+	}
 	out, err := helper("interfaces").Output()
 	if err != nil {
 		return nil
@@ -128,6 +132,18 @@ func GetActiveVPNs() []string {
 		}
 	}
 	return active
+}
+
+// anyWireGuardLink reports whether any WireGuard interface exists, using
+// sysfs so it needs no root. The kernel tags them DEVTYPE=wireguard.
+func anyWireGuardLink() bool {
+	files, _ := filepath.Glob("/sys/class/net/*/uevent")
+	for _, f := range files {
+		if data, err := os.ReadFile(f); err == nil && strings.Contains(string(data), "DEVTYPE=wireguard") {
+			return true
+		}
+	}
+	return false
 }
 
 func ListConfigs() []string {

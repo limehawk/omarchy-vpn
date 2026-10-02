@@ -52,7 +52,7 @@ type model struct {
 	modal       modalState
 	renameInput textinput.Model
 	renameOrig  string
-	importPath  string // pending source file when renaming as part of import
+	importPath  string   // pending source file when renaming as part of import
 	importName  string   // target name while confirming a config with hooks
 	importHooks []string // hook lines shown in the confirm overlay
 	connectName string
